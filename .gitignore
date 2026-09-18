@@ -1,0 +1,24 @@
+# Object & compiled files
+*.o
+*.a
+*.mod
+*.so
+*.dylib
+
+# CalculiX simulation output files
+*.frd
+*.dat
+*.sta
+*.cvg
+*.12d
+*.csv
+*.rout
+spooles.out
+
+# Test & benchmark output directories
+*_results/
+eigen_modes_benchmark_results/
+pdelta_benchmark_results/
+pushover_plasticity_results/
+mixed_beam_demo_results/
+
