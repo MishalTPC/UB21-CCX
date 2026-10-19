@@ -140,14 +140,12 @@
 !     
         elseif(label(1:3).eq.'B21') then
           label='B31     '
-        endif
-!
-!       Mecway compatibility: route conventional B31 input to the
-!       native 2-node UB31 formulation.  The internal UB31 label is
-!       completed below with integration-point/DOF/node metadata.
-!
-        if(label.eq.'B31     ') then
-          label='UB31    '
+        elseif(label.eq.'B31T    ') then
+!         Native 2-node Timoshenko beam; solved by the UB31 kernel.
+          label='UB31T   '
+        elseif(label.eq.'B31E    ') then
+!         Native 2-node Euler-Bernoulli beam; solved by the UB31 kernel.
+          label='UB31E   '
         elseif(label(1:4).eq.'T2D2') then
           label='T3D2    '
         endif
@@ -410,15 +408,14 @@ c     Bernhardi end
         nope=1
         nopeexp=1
       elseif(label(1:1).eq.'U') then
-        if(label(1:4).eq.'UB31') then
-!         Built-in alias for the UB31 formulation.  This permits a
-!         conventional *ELEMENT,TYPE=B31 deck to use UB31 without an
-!         explicit *USER ELEMENT declaration.
+        if((label(1:5).eq.'UB31T').or.
+     &     (label(1:5).eq.'UB31E')) then
+!         B31T/B31E are native input names mapped internally to UB31.
+!         They do not require an explicit *USER ELEMENT declaration.
           intpoints=1
           ndof=6
           nope=2
           nopeexp=2
-          label(1:4)='UB31'
           label(6:6)=char(intpoints)
           label(7:7)=char(ndof)
           label(8:8)=char(nope)
