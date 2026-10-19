@@ -79,6 +79,15 @@ jobs:
           cd smoke/b31
           ./ccx_2.23.exe 18_legacy_b31_unchanged
 
+      - name: Mecway open-channel regression smoke test
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/mecway-channel
+          cp dist/windows/* smoke/mecway-channel/
+          cp validation/19_mecway_open_channel_box.inp smoke/mecway-channel/
+          cd smoke/mecway-channel
+          ./ccx_2.23.exe 19_mecway_open_channel_box
+
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
