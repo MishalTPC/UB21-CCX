@@ -146,8 +146,10 @@
         enddo
       elseif(textpart(1)(1:12).eq.'*BEAMSECTION') then
         mi(3)=max(mi(3),2)
-!       Reserve one UB31 property record as well.  Conventional B31
-!       sections may be routed to userbeamsections() during calinput.
+!       Native B31T/B31E sections use the UB31 property store.  Reserve
+!       one 30-slot record (+2 safety slots) for this section card.
+!       The small over-allocation for ordinary B31 sections is harmless
+!       and keeps the allocation pass independent of element-set lookup.
         nprop_=nprop_+32
         beamgeneralsection=.false.
         do i=2,n
@@ -1036,15 +1038,17 @@ c     Bernhardi end
               mi(1)=max(mi(1),27)
               nope=8
               nopeexp=28
-            elseif(label.eq.'B31     ') then
-!             Mecway compatibility: B31 is solved directly by UB31,
-!             so no beam-to-solid expansion is required.
+            elseif((label.eq.'B31T    ').or.
+     &             (label.eq.'B31E    ')) then
+!             Native direct 2-node beam formulations.  Unlike legacy
+!             B31, these are not expanded into solid elements.
               mi(1)=max(mi(1),1)
               mi(2)=max(mi(2),6)
               mi(3)=max(mi(3),2)
               nope=2
               nopeexp=2
-            elseif((label.eq.'B21     ').or.
+            elseif((label.eq.'B31     ').or.
+     &             (label.eq.'B21     ').or.
      &             (label.eq.'T3D2    ').or.
      &             (label.eq.'T2D2    ')) then
               mi(1)=max(mi(1),8)
