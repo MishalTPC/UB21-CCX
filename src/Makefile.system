@@ -32,7 +32,7 @@ OCCXMAIN = $(SCCXMAIN:.c=.o)
 LIBS = -lspooles -larpack -llapack -lblas -lpthread -lm -lc
 
 ccx_2.23: $(OCCXMAIN) ccx_2.23.a
-	./date.pl
+	perl ./date.pl
 	$(CC) $(CFLAGS) -c ccx_2.23.c
 	$(FC) -fopenmp -Wall -O2 -static-libgcc -static-libgfortran \
 	      -o $@ $(OCCXMAIN) ccx_2.23.a $(LIBS)
