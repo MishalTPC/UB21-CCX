@@ -4,7 +4,7 @@
 # Build from an MSYS2 MinGW64 shell:
 #   make -f Makefile.windows -j2
 
-CFLAGS = -Wall -O2 -g -I/mingw64/include/spooles \
+CFLAGS = -Wall -Wno-error=return-mismatch -O2 -g -I/mingw64/include/spooles \
          -DARCH="Linux" -DSPOOLES -DARPACK -DMATRIXSTORAGE -DNETWORKOUT
 FFLAGS = -Wall -O2 -fopenmp -cpp
 
