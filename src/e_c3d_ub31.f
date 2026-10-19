@@ -150,6 +150,16 @@
          e2_in(2)=prop(index+18)
          e2_in(3)=prop(index+19)
          timo_val=prop(index+20)
+!
+!        Native direct-beam element names encode the formulation in
+!        lakon character 5.  Plain UB31 retains the section-card setting.
+         if(lakonl(5:5).eq.'T') then
+!           Timoshenko: use automatically calculated section shear factors.
+            timo_val=0.d0
+         elseif(lakonl(5:5).eq.'E') then
+!           Euler-Bernoulli: suppress transverse shear deformation.
+            timo_val=-1.d0
+         endif
       else
          write(*,*) '*ERROR in e_c3d_ub31: element ',nelem,
      &        ' has no section properties.'
@@ -1200,4 +1210,3 @@
  !
       return
       end
-
