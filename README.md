@@ -3,12 +3,12 @@
 [![CalculiX](https://img.shields.io/badge/CalculiX-CCX%202.23-blue.svg)](http://www.calculix.de/)
 [![Element](https://img.shields.io/badge/Element-UB31-green.svg)]()
 [![Kinematics](https://img.shields.io/badge/Formulation-Timoshenko%20%2F%20Euler--Bernoulli-orange.svg)]()
-[![Validation](https://img.shields.io/badge/Validation-100%25%20Verified-brightgreen.svg)]()
+[![Validation](https://img.shields.io/badge/Validation-Development%20%2F%20Regression-yellow.svg)]()
 [![License](https://img.shields.io/badge/License-GPL%20v2-lightgrey.svg)](src/gpl.htm)
 
 A native extension and patch for **CalculiX CCX 2.23** adding the **UB31 (2-node 3D Timoshenko / Euler-Bernoulli user beam element)** and **User Beam Sections** system.
 
-**Mecway compatibility in this fork:** conventional `*ELEMENT, TYPE=B31` together with standard `*BEAM SECTION` syntax can be used directly. The input reader routes those `B31` elements internally to the UB31 formulation, so Mecway-exported beam decks do not require an external UB31 text-conversion step. The original explicit `UB31` / `*USER BEAM SECTION` syntax remains supported.
+> **Native beam interface (development):** this branch accepts `*ELEMENT, TYPE=B31T` and `TYPE=B31E` with standard `*BEAM SECTION` input. `B31T` selects the Timoshenko formulation and `B31E` selects Euler-Bernoulli. The historical CalculiX `B31` element is deliberately left unchanged for backward compatibility. See `NATIVE_BEAM_INTERFACE.md`.
 
 This implementation provides high-accuracy 3D beam modeling with complete rotational coupling, 8 cross-section shapes, member end releases (hinges), 3D geometric nodal offsets, rich distributed load distributions, mass formulation choices, and enhanced post-processing in **CalculiX GraphiX (CGX)**.
 
@@ -45,7 +45,7 @@ This implementation provides high-accuracy 3D beam modeling with complete rotati
 
 ## 🚀 Key Features
 
-- **Mecway-Compatible `B31` Alias**: standard `*ELEMENT, TYPE=B31` and `*BEAM SECTION` input can be routed directly to the UB31 formulation without an external conversion script.
+- **Native `B31T` / `B31E` Interface**: standard `*ELEMENT` and `*BEAM SECTION` input can call the direct UB31-based beam formulations without overriding legacy `B31`.
 - **Element Formulation**: 2-node 3D beam element (`UB31`) with 6 DOFs per node (`UX`, `UY`, `UZ`, `ROTX`, `ROTY`, `ROTZ`).
 - **Timoshenko Shear & Limiting Euler-Bernoulli Kinematics**: Exact shear coefficients computed automatically based on cross-section geometry and Poisson's ratio $\nu$.
 - **8 Cross-Section Profiles**: `RECT`, `CIRC`, `PIPE`, `I`, `T`, `CHAN` (U-channel), `L` (Angle), and `BOX` (Hollow Box).
@@ -60,12 +60,20 @@ This implementation provides high-accuracy 3D beam modeling with complete rotati
 
 ---
 
-## 🔄 Mecway / Standard B31 Compatibility
+## 🔄 Native B31T / B31E Compatibility
 
-This fork adds an input-compatibility layer intended for **Mecway → CalculiX** workflows. A conventional two-node CalculiX beam definition such as:
+This branch keeps the historical CalculiX `B31` element unchanged and adds two native-style direct beam names:
+
+```text
+B31T = 2-node Timoshenko beam
+B31E = 2-node Euler-Bernoulli beam
+B31  = original CalculiX expanded beam (unchanged)
+```
+
+Both native direct-beam names use conventional CalculiX input:
 
 ```inp
-*ELEMENT, TYPE=B31, ELSET=EBEAM
+*ELEMENT, TYPE=B31T, ELSET=EBEAM
 1, 1, 2
 
 *BEAM SECTION, ELSET=EBEAM, MATERIAL=STEEL, SECTION=RECT
@@ -73,37 +81,11 @@ This fork adds an input-compatibility layer intended for **Mecway → CalculiX**
 0.0, 0.0, 1.0
 ```
 
-is interpreted internally as a UB31 beam. The solver therefore uses the true two-node, six-DOF UB31 formulation rather than sending the element through CalculiX's conventional beam-to-solid expansion path.
+Internally, `B31T` and `B31E` are routed to the UB31 kernel while retaining a formulation marker that selects Timoshenko or Euler-Bernoulli behavior. No `*USER ELEMENT` declaration is required for these native-style names.
 
-### What this removes from the Mecway workflow
+The explicit `UB31` / `*USER BEAM SECTION` development interface remains supported.
 
-A Mecway-exported deck no longer needs to be externally rewritten from:
-
-```text
-B31 + *BEAM SECTION
-```
-
-to:
-
-```text
-UB31 + *USER ELEMENT + *USER BEAM SECTION
-```
-
-The conversion is performed inside the modified CalculiX input reader.
-
-### Compatibility behavior
-
-- `TYPE=B31` is stored internally as `UB31` with **2 nodes**, **6 DOF per node**, and **1 integration point**.
-- Standard `*BEAM SECTION` is routed to the UB31 section-property reader when it targets these internally mapped elements.
-- The original explicit `*USER ELEMENT, TYPE=UB31` and `*USER BEAM SECTION` syntax remains available.
-- `B31R`, `B32`, and other beam element types are not part of this compatibility alias.
-- In this fork, a standard `B31` intentionally means **UB31**. If the conventional CalculiX expanded `B31` behavior is required, use an unmodified CalculiX executable.
-
-A regression deck for this interface is provided at [`validation/mecway_b31_alias.inp`](validation/mecway_b31_alias.inp). Additional implementation notes are in [`MECWAY_COMPATIBILITY.md`](MECWAY_COMPATIBILITY.md).
-
-> **Build status:** the source code contains the Mecway compatibility changes. The precompiled executables currently present under `Release/` predate this fork-specific patch and therefore do **not** provide the `B31` → UB31 alias. Rebuild `ccx_2.23` from the modified `src/` tree before testing this workflow.
-
----
+See `NATIVE_BEAM_INTERFACE.md` for implementation details and validation status.
 
 ## 📁 Repository Structure
 
@@ -316,12 +298,12 @@ ccx_2.23 cantilever
 
 ## 📖 Input Syntax & Usage
 
-### 0. Mecway-Compatible Standard Syntax (`B31` + `*BEAM SECTION`)
+### 0. Native Direct Beam Syntax (`B31T` / `B31E` + `*BEAM SECTION`)
 
-For direct Mecway compatibility, define ordinary `B31` elements and a standard beam section:
+Use `B31T` for Timoshenko behavior:
 
 ```inp
-*ELEMENT, TYPE=B31, ELSET=EBEAM
+*ELEMENT, TYPE=B31T, ELSET=EBEAM
 1, 1, 2
 2, 2, 3
 
@@ -330,11 +312,9 @@ For direct Mecway compatibility, define ordinary `B31` elements and a standard b
 0.0, 0.0, 1.0
 ```
 
-The first `*BEAM SECTION` data line contains the section dimensions. The following line supplies the beam orientation vector, matching the conventional CalculiX/Mecway format. The compatibility layer maps these properties into the UB31 property storage and uses the UB31 element kernel.
+Use `B31E` for Euler-Bernoulli behavior. The standard `B31` keyword is not intercepted and continues to select the historical CalculiX expanded beam implementation.
 
-This mode is intended to allow Mecway to export an ordinary CalculiX beam model and solve it using the UB31 formulation **without an external conversion script**.
-
-> `B31` is deliberately overridden by this fork. The conventional CalculiX expanded `B31` implementation is therefore not selected when using this modified executable.
+This provides pre/post processors with a native-readable element syntax without breaking existing CalculiX input files.
 
 ### 1. User Element Declaration (`*USER ELEMENT`)
 Before defining any UB31 elements, declare the user element type:
@@ -893,7 +873,7 @@ plot f                   # Render contours
 
 ## ✅ Validation Suite
 
-The repository includes 15 standalone `.inp` verification decks in [`validation/`](validation/) covering all UB31 capabilities against exact theoretical/analytical structural mechanics solutions:
+The repository includes 18 standalone `.inp` verification/development decks in [`validation/`](validation/) covering all UB31 capabilities against exact theoretical/analytical structural mechanics solutions:
 
 | Deck | Category | Key Validation Target | Theoretical Reference |
 | :--- | :--- | :--- | :--- |
