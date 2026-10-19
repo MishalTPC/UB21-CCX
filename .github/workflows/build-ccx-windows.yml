@@ -1,0 +1,87 @@
+name: Build CCX UB31 Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'src/**'
+      - 'validation/**'
+      - '.github/workflows/build-ccx-windows.yml'
+
+jobs:
+  build-windows:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 MinGW64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            perl
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gcc-fortran
+            mingw-w64-x86_64-spooles
+            mingw-w64-x86_64-arpack
+            mingw-w64-x86_64-openblas
+
+      - name: Build CCX Windows executable
+        shell: msys2 {0}
+        working-directory: src
+        run: |
+          make -f Makefile.windows -j2
+
+      - name: Assemble portable Windows artifact
+        shell: msys2 {0}
+        run: |
+          mkdir -p dist/windows
+          cp src/ccx_2.23.exe dist/windows/
+
+          # Copy non-system runtime DLLs required by the MinGW executable.
+          ldd src/ccx_2.23.exe | awk '/=> \/mingw64\// {print $3}' | while read dll; do
+            [ -f "$dll" ] && cp -n "$dll" dist/windows/
+          done
+
+          echo "Windows artifact contents:"
+          ls -lh dist/windows
+
+      - name: Native B31T smoke test
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/b31t
+          cp dist/windows/* smoke/b31t/
+          cp validation/16_native_b31t_cantilever.inp smoke/b31t/
+          cd smoke/b31t
+          ./ccx_2.23.exe 16_native_b31t_cantilever
+
+      - name: Native B31E smoke test
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/b31e
+          cp dist/windows/* smoke/b31e/
+          cp validation/17_native_b31e_cantilever.inp smoke/b31e/
+          cd smoke/b31e
+          ./ccx_2.23.exe 17_native_b31e_cantilever
+
+      - name: Legacy B31 regression smoke test
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/b31
+          cp dist/windows/* smoke/b31/
+          cp validation/18_legacy_b31_unchanged.inp smoke/b31/
+          cd smoke/b31
+          ./ccx_2.23.exe 18_legacy_b31_unchanged
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccx-2.23-ub31-windows-x86_64
+          path: dist/windows/
+          if-no-files-found: error
