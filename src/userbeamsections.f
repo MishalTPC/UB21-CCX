@@ -70,7 +70,7 @@
       real*8 thicke(mi(3),*),thickness1,thickness2,p(3),xnor(*),
      &  offset(2,*),offset1,offset2,dd,dims_temp(6),sect_type_val,
      &  prop(*), off1(3), off2(3), off3(3), rel1, rel2, rel3,
-     &  rot_angle_val, timo_val, custom_k
+     &  rot_angle_val, timo_val, custom_k, open_tol, flange_tol
 !
       if((istep.gt.0).and.(irstrt(1).ge.0)) then
          write(*,*) 
@@ -248,7 +248,35 @@
       endif
       iset=i
 !
-!     map section name to numeric type code (same codes as usersections)
+!     Section type is finalized after the dimension line is read.
+!     This permits native Mecway *BEAM SECTION cards which encode some
+!     open sections using SECTION=BOX with one zero wall thickness.
+!
+!     --- read the first data line: up to 6 dimension values ---
+!
+      call getnewline(inpc,textpart,istat,n,key,iline,ipol,inl,
+     &     ipoinp,inp,ipoinpc)
+!
+      do m = 1, 6
+         dims_temp(m) = 0.d0
+         if(.not.nodalthickness .and. m .le. n) then
+            read(textpart(m)(1:20),'(f20.0)',iostat=istat) dims_temp(m)
+            if(istat.gt.0) dims_temp(m) = 0.d0
+         endif
+      enddo
+!
+!     Finalize section type.  Mecway can export an open C/channel section
+!     as SECTION=BOX using:
+!       h,b,t_bottom,t_left,t_top,0
+!     or the mirrored form:
+!       h,b,t_bottom,0,t_top,t_right
+!     If top and bottom flange thicknesses agree, map this directly to the
+!     UB31 CHAN formulation instead of evaluating a singular closed box.
+!
+      open_tol=1.d-12*max(1.d0,dabs(dims_temp(1)),
+     &                        dabs(dims_temp(2)))
+      flange_tol=1.d-8*max(1.d0,dabs(dims_temp(3)),
+     &                          dabs(dims_temp(5)))
 !
       if (section .eq. 'RECT') then
          sect_type_val = 1.d0
@@ -265,23 +293,35 @@
       elseif (section .eq. 'L   ') then
          sect_type_val = 6.d0
       elseif (section .eq. 'BOX ') then
-         sect_type_val = 7.d0
+         if((dims_temp(3).gt.open_tol).and.
+     &      (dims_temp(5).gt.open_tol).and.
+     &      (dabs(dims_temp(3)-dims_temp(5)).le.flange_tol).and.
+     &      (((dims_temp(4).gt.open_tol).and.
+     &        (dabs(dims_temp(6)).le.open_tol)).or.
+     &       ((dabs(dims_temp(4)).le.open_tol).and.
+     &        (dims_temp(6).gt.open_tol)))) then
+!
+!           Three-sided BOX -> channel.  Preserve h,b and convert the
+!           remaining dimensions to CHAN(h,b,t_flange,t_web).
+!
+            write(*,*) '*INFO: open SECTION=BOX detected for ',elset
+            write(*,*) '       mapping Mecway 3-sided box to CHAN'
+            if(dims_temp(4).gt.open_tol) then
+               dims_temp(4)=dims_temp(4)
+            else
+               dims_temp(4)=dims_temp(6)
+            endif
+            dims_temp(3)=0.5d0*(dims_temp(3)+dims_temp(5))
+            dims_temp(5)=0.d0
+            dims_temp(6)=0.d0
+            sect_type_val = 5.d0
+         else
+            sect_type_val = 7.d0
+         endif
       else
          sect_type_val = 1.d0
       endif
 !
-!     --- read the first data line: up to 6 dimension values ---
-!
-      call getnewline(inpc,textpart,istat,n,key,iline,ipol,inl,
-     &     ipoinp,inp,ipoinpc)
-!
-      do m = 1, 6
-         dims_temp(m) = 0.d0
-         if(.not.nodalthickness .and. m .le. n) then
-            read(textpart(m)(1:20),'(f20.0)',iostat=istat) dims_temp(m)
-            if(istat.gt.0) dims_temp(m) = 0.d0
-         endif
-      enddo
       thickness1=dims_temp(1)
       thickness2=dims_temp(2)
 !
