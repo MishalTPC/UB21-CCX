@@ -1,0 +1,51 @@
+# CalculiX CCX 2.23 + UB31/B31T/B31E
+# Windows x86_64 build under MSYS2 MinGW64
+#
+# Build from an MSYS2 MinGW64 shell:
+#   make -f Makefile.windows -j2
+
+CFLAGS = -Wall -O2 -g -I/mingw64/include/spooles \
+         -DARCH="Linux" -DSPOOLES -DARPACK -DMATRIXSTORAGE -DNETWORKOUT
+FFLAGS = -Wall -O2 -fopenmp -cpp
+
+CC = gcc
+FC = gfortran
+
+.c.o :
+	$(CC) $(CFLAGS) -c $<
+
+.f.o :
+	$(FC) $(FFLAGS) -c $<
+
+include Makefile.inc
+
+SCCXMAIN = ccx_2.23.c
+
+OCCXF = $(SCCXF:.f=.o)
+OCCXC = $(SCCXC:.c=.o)
+OCCXMAIN = $(SCCXMAIN:.c=.o)
+
+LIBS = -L/mingw64/lib -lspooles -larpack -lopenblas -lwinpthread -lm
+
+ccx_2.23.exe: $(OCCXMAIN) ccx_2.23.a
+	perl ./date.pl
+	$(CC) $(CFLAGS) -c ccx_2.23.c
+	$(FC) -fopenmp -Wall -O2 -o $@ $(OCCXMAIN) ccx_2.23.a $(LIBS)
+
+ccx_2.23.a: $(OCCXF) $(OCCXC)
+	ar rcs $@ $?
+
+calinput.o: usercomb_module.o codecheck_module.o
+userloadcombinations.o: usercomb_module.o
+usercodecheck.o: codecheck_module.o ub31_module.o
+e_c3d_ub31.o: ub31_module.o
+resultsmech_ub31.o: ub31_module.o codecheck_module.o
+getub31stx.o: ub31_module.o codecheck_module.o
+userbeamreleases.o: ub31_module.o
+userbeamoutputs.o: ub31_module.o
+mafillsm.o: ub31_module.o
+e_c3d_uconn6.o: uconn6_module.o
+resultsmech_uconn6.o: uconn6_module.o
+userconnectors.o: uconn6_module.o
+userconnectoroutputs.o: uconn6_module.o
+uconn_plasticity.o: uconn6_module.o
