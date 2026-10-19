@@ -1,13 +1,18 @@
-# Mecway B31 compatibility
+# Mecway / Native Beam Compatibility
 
-This fork routes conventional CalculiX `B31` input to the native two-node
-`UB31` formulation so that a Mecway-exported beam deck does not need an
-external text-conversion step.
+The earlier development approach redirected ordinary `B31` input to the UB31 formulation. That approach has been retired to preserve CalculiX backward compatibility.
 
-## Accepted input
+## Current approach
+
+- `B31` remains the original CalculiX expanded beam element.
+- `B31T` is the native-style 2-node Timoshenko interface backed by the UB31 kernel.
+- `B31E` is the native-style 2-node Euler-Bernoulli interface backed by the UB31 kernel.
+- Explicit `UB31` input remains available for user-element development.
+
+Example:
 
 ```text
-*ELEMENT, TYPE=B31, ELSET=EBEAM
+*ELEMENT, TYPE=B31T, ELSET=EBEAM
 1, 1, 2
 
 *BEAM SECTION, ELSET=EBEAM, MATERIAL=STEEL, SECTION=RECT
@@ -15,25 +20,14 @@ external text-conversion step.
 0.0, 0.0, 1.0
 ```
 
-For these `B31` elements the input reader internally stores `UB31` and uses
-the UB31 kernel. `*BEAM SECTION` is routed to the existing UB31 section
-property reader when its target element set contains these elements.
+This retains native-readable CalculiX-style input for preprocessors while avoiding any change in meaning for historical `B31` decks.
 
-The original explicit syntax remains available:
+## Mecway
 
-```text
-*USER ELEMENT, TYPE=UB31, NODES=2, MAXDOF=6, INTEGRATIONPOINTS=1
-*ELEMENT, TYPE=UB31, ELSET=EBEAM
-...
-*USER BEAM SECTION, ELSET=EBEAM, MATERIAL=STEEL, SECTION=RECT
-...
-```
+For a transparent Mecway workflow, the preferred long-term integration is for the exporter to emit `B31T` or `B31E` when the direct beam formulation is selected. If Mecway currently emits only `B31`, exporter support is required rather than overriding CalculiX's existing `B31` semantics.
 
-## Scope of this first compatibility patch
+See `NATIVE_BEAM_INTERFACE.md` and validation decks 16-18.
 
-- `B31` is routed to `UB31` with 2 nodes, 6 DOF/node and 1 integration point.
-- Standard `*BEAM SECTION` is routed to `userbeamsections()` for UB31 sets.
-- Existing non-UB31 beam section handling is retained.
-- Existing explicit UB31 input remains supported.
+## Validation status
 
-Regression input: `validation/mecway_b31_alias.inp`.
+The parser and source changes are implemented on the development branch. Full rebuilt-executable regression is still required before the interface should be considered production-ready.
