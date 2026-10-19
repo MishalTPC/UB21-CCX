@@ -295,10 +295,24 @@
          
          h_mean = h - 0.5d0 * (t_f + t_b)
          b_mean = b - 0.5d0 * (t_w + dims(6))
-         
-         J = 4.d0 * (h_mean * b_mean)**2 / 
-     &       (b_mean*(1.d0/t_f + 1.d0/t_b) + 
-     &        h_mean*(1.d0/t_w + 1.d0/dims(6)))
+!
+!        Closed boxes use the Bredt thin-wall torsion expression.
+!        Mecway may encode open sections as BOX with one or more wall
+!        thicknesses equal to zero.  In that case use the open thin-wall
+!        sum J = sum(b_i*t_i^3/3) rather than dividing by a zero wall.
+!
+         if((t_f.gt.1.d-14).and.(t_b.gt.1.d-14).and.
+     &      (t_w.gt.1.d-14).and.(dims(6).gt.1.d-14)) then
+            J = 4.d0 * (h_mean * b_mean)**2 / 
+     &          (b_mean*(1.d0/t_f + 1.d0/t_b) + 
+     &           h_mean*(1.d0/t_w + 1.d0/dims(6)))
+         else
+            J = (1.d0/3.d0) * b * (t_f**3) +
+     &          (1.d0/3.d0) * b * (t_b**3) +
+     &          (1.d0/3.d0) * max(0.d0,h-t_f-t_b) * (t_w**3) +
+     &          (1.d0/3.d0) * max(0.d0,h-t_f-t_b) *
+     &          (dims(6)**3)
+         endif
          
          xk_y = (rh(3)*rb(3) + rh(4)*rb(4)) / A
          xk_z = (rb(1)*rh(1) + rb(2)*rh(2)) / A
