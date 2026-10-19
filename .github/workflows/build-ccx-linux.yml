@@ -1,0 +1,63 @@
+name: Build CCX UB31 Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-ccx-linux.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            gcc \
+            gfortran \
+            make \
+            perl \
+            libspooles-dev \
+            libarpack2-dev \
+            liblapack-dev \
+            libblas-dev
+
+      - name: Build CCX
+        working-directory: src
+        run: |
+          make -f Makefile.system -j2
+
+      - name: Show executable
+        working-directory: src
+        run: |
+          ls -lh ccx_2.23
+          file ccx_2.23
+
+      - name: Upload CCX executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccx-2.23-ub31-linux-x86_64
+          path: src/ccx_2.23
+          if-no-files-found: error
+
+      - name: Native beam smoke tests
+        continue-on-error: true
+        run: |
+          mkdir -p build-smoke
+          cp src/ccx_2.23 build-smoke/
+          cp validation/16_native_b31t_cantilever.inp build-smoke/
+          cp validation/17_native_b31e_cantilever.inp build-smoke/
+          cp validation/18_legacy_b31_unchanged.inp build-smoke/
+          cd build-smoke
+          ./ccx_2.23 16_native_b31t_cantilever
+          ./ccx_2.23 17_native_b31e_cantilever
+          ./ccx_2.23 18_legacy_b31_unchanged
