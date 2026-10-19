@@ -299,10 +299,10 @@
 !     
       elseif(textpart(1)(1:12).eq.'*BEAMSECTION') then
 !
-!       Mecway compatibility.  B31 elements are stored internally as
-!       UB31.  If this *BEAM SECTION targets a UB31 set, reuse the
-!       existing UB31 section reader; otherwise retain standard CCX
-!       behavior for all other beam types.
+!       Native direct-beam interface.  B31T/B31E are stored internally
+!       as UB31T/UB31E.  Route their standard *BEAM SECTION card to the
+!       UB31 property reader.  Legacy B31 and all other beam types retain
+!       the original CalculiX section handling unchanged.
 !
         ub31beamsection=.false.
         elsetbs=' '
@@ -322,7 +322,8 @@
             if(elsetbs.eq.set(ibs)) then
               do jbs=istartset(ibs),iendset(ibs)
                 if(ialset(jbs).gt.0) then
-                  if(lakon(ialset(jbs))(1:4).eq.'UB31') then
+                  if((lakon(ialset(jbs))(1:5).eq.'UB31T').or.
+     &               (lakon(ialset(jbs))(1:5).eq.'UB31E')) then
                     ub31beamsection=.true.
                   endif
                   exit
@@ -330,7 +331,8 @@
 !                 Generated-set encoding: inspect the first member.
                   kbs=ialset(jbs-2)-ialset(jbs)
                   if(kbs.ge.ialset(jbs-1)) then
-                    if(lakon(kbs)(1:4).eq.'UB31') then
+                    if((lakon(kbs)(1:5).eq.'UB31T').or.
+     &                 (lakon(kbs)(1:5).eq.'UB31E')) then
                       ub31beamsection=.true.
                     endif
                     exit
