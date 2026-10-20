@@ -1,0 +1,16 @@
+{
+  "beam_type": "B31T",
+  "releases": [
+    {
+      "target": "E1",
+      "end": 1,
+      "code": "M1-M2"
+    },
+    {
+      "target": 217,
+      "end": 2,
+      "code": "M2",
+      "spring": 0.0
+    }
+  ]
+}
