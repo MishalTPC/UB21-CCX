@@ -23,6 +23,18 @@ program test_ccx_beam_axes
   call assert_close('RECT Izz',izz,0.2d0*0.1d0**3/12.d0)
   if (iyy.le.izz) stop 'FAIL: expected strong axis about local 1'
 
+  ! CCX CIRC: diameters (not radii) in local 1 and local 2.
+  d=0.d0
+  d(1)=0.10d0
+  d(2)=0.20d0
+  call compute_section_properties(8.d0,d,210.d9,0.3d0, &
+       area,iyy,izz,torsion,ky,kz,angle)
+  call assert_close('CIRC ellipse area',area,pi*0.10d0*0.20d0/4.d0)
+  call assert_close('CIRC ellipse Iyy',iyy, &
+       pi*0.10d0*0.20d0**3/64.d0)
+  call assert_close('CIRC ellipse Izz',izz, &
+       pi*0.20d0*0.10d0**3/64.d0)
+
   ! CCX BOX: t1=+1, t2=+2, t3=-1, t4=-2.
   ! A centred closed box has area / inertias equal to outer-inner.
   d=(/0.18d0,0.07d0,0.011d0,0.008d0,0.011d0,0.008d0/)
@@ -76,7 +88,7 @@ program test_ccx_beam_axes
        raw_iy*sin(theta)**2+raw_iz*cos(theta)**2+ &
        2.d0*raw_iyz*sin(theta)*cos(theta))
 
-  print *, 'PASS: CCX RECT/BOX axes and L principal rotation'
+  print *, 'PASS: CCX RECT/CIRC/BOX axes and L principal rotation'
 contains
   subroutine assert_close(name,actual,expected)
     character(*),intent(in) :: name
