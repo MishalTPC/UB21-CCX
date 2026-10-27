@@ -47,7 +47,7 @@
 !
       implicit none
 !
-      logical nodalthickness
+      logical nodalthickness,is_native_section
 !
       character*1 inpc(*)
       character*4 section
@@ -81,6 +81,7 @@
          return
       endif
 !
+      is_native_section=textpart(1)(1:12).eq.'*BEAMSECTION'
       nodalthickness=.false.
       offset1=0.d0
       offset2=0.d0
@@ -271,7 +272,14 @@
       if (section .eq. 'RECT') then
          sect_type_val = 1.d0
       elseif (section .eq. 'CIRC') then
-         sect_type_val = 2.d0
+!        Native CalculiX CIRC uses two FULL ellipse diameters.
+!        Explicit *USER BEAM SECTION CIRC retains its legacy radius.
+         if(is_native_section) then
+            sect_type_val = 8.d0
+            if(dims_temp(2).le.0.d0) dims_temp(2)=dims_temp(1)
+         else
+            sect_type_val = 2.d0
+         endif
       elseif (section .eq. 'PIPE') then
          sect_type_val = 2.d0
       elseif (section .eq. 'I   ') then
