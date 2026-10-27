@@ -131,6 +131,21 @@
          endif
          xk_z = xk_y
 
+      elseif (st .eq. 8) then
+         ! Native CalculiX SECTION=CIRC: full diameters along
+         ! local 1/e2 and local 2/e3.  Ellipse is supported.
+         b=dims(1)
+         h=dims(2)
+         A=pi*b*h/4.d0
+         Iyy=pi*b*h**3/64.d0
+         Izz=pi*h*b**3/64.d0
+!        Saint-Venant torsion constant of an elliptic cylinder.
+         J=pi*(b**3)*(h**3)/(16.d0*(b*b+h*h))
+!        Circular Cowper shear factor; elliptical shear corrections
+!        remain an approximation for non-circular sections.
+         xk_y=6.d0*(1.d0+nu)/(7.d0+6.d0*nu)
+         xk_z=xk_y
+
       elseif (st .eq. 3) then
          ! I-beam section (dims: h, b_top, t_f_top, b_bot, t_f_bot, t_w)
          h = dims(1)
