@@ -70,7 +70,7 @@
       real*8 thicke(mi(3),*),thickness1,thickness2,p(3),xnor(*),
      &  offset(2,*),offset1,offset2,dd,dims_temp(6),sect_type_val,
      &  prop(*), off1(3), off2(3), off3(3), rel1, rel2, rel3,
-     &  rot_angle_val, timo_val, custom_k, open_tol, flange_tol
+     &  rot_angle_val, timo_val, custom_k
 !
       if((istep.gt.0).and.(irstrt(1).ge.0)) then
          write(*,*) 
