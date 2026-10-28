@@ -1281,7 +1281,8 @@ c
      &       ipoinp,inp,ipoinpc,mi,ielprop,nprop,nprop_,prop,
      &       nelcon,ier)
 !     
-      elseif(textpart(1)(1:16).eq.'*USERBEAMRELEASE') then
+      elseif(textpart(1)(1:16).eq.'*USERBEAMRELEASE' .or.
+     &       textpart(1)(1:8).eq.'*RELEASE') then
         call userbeamreleases(inpc,textpart,set,istartset,iendset,
      &       ialset,nset,lakon,ne,irstrt,istep,istat,n,key,iline,
      &       ipol,inl,ipoinp,inp,ipoinpc,ier)
