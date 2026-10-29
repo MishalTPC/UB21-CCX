@@ -88,6 +88,20 @@ jobs:
           cd smoke/mecway-channel
           ./ccx_2.23.exe 19_mecway_open_channel_box
 
+      - name: Mecway M1/M2 opt-in compatibility smoke test
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/mecway-release
+          cp dist/windows/* smoke/mecway-release/
+          cp validation/21_mecway_release_axis_swap.inp smoke/mecway-release/
+          cd smoke/mecway-release
+          ./ccx_2.23.exe 21_mecway_release_axis_swap > normal.log 2>&1
+          cp 21_mecway_release_axis_swap.frd normal.frd
+          CCX_MECWAY_SWAP_RELEASE_AXES=1 ./ccx_2.23.exe 21_mecway_release_axis_swap > compat.log 2>&1
+          cp 21_mecway_release_axis_swap.frd compat.frd
+          grep -q 'Mecway release axis compatibility' compat.log
+          python "$GITHUB_WORKSPACE/validation/check_mecway_release_swap.py" normal.frd compat.frd
+
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:

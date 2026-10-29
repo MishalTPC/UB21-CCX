@@ -49,11 +49,32 @@
       real*8, allocatable :: temp_spring(:,:,:)
       real*8 spring_k
       logical elset_from_header, has_spring_val, abaqus_mode
+      logical mecway_release_swap
+      character*16 mecway_swap_env
+      integer env_stat
 !
 !     Standard *RELEASE uses Abaqus S1/S2 and rotational codes only.
 !     The older *USER BEAM RELEASE extension remains available.
 !
       abaqus_mode = (textpart(1)(1:8) .eq. '*RELEASE')
+!
+!     Opt-in workaround for Mecway V/W-to-M1/M2 export mismatch.
+!     The default remains Abaqus-compatible.  The mode only affects
+!     standard *RELEASE entries (never *USER BEAM RELEASE).
+!
+      mecway_release_swap = .false.
+      mecway_swap_env = ' '
+      if (abaqus_mode) then
+         call get_environment_variable(
+     &        'CCX_MECWAY_SWAP_RELEASE_AXES',mecway_swap_env,
+     &        status=env_stat)
+         if (env_stat.eq.0 .and.
+     &       trim(adjustl(mecway_swap_env)).eq.'1') then
+            mecway_release_swap = .true.
+            write(*,*) '*INFO: Mecway release axis compatibility ',
+     &                 'enabled: M1 and M2 exchanged for *RELEASE.'
+         endif
+      endif
       if (abaqus_mode .and. n .ne. 1) then
          write(*,*) '*ERROR in *RELEASE: keyword parameters'
          write(*,*) '       are not supported by this interface.'
@@ -224,6 +245,12 @@
                call inputerror(inpc,ipoinpc,iline,
      &              "*USER BEAM RELEASE%",ier)
                return
+            endif
+!
+!           Mecway compatibility is opt-in: swap bending axes only.
+!           T, M1-M2, and ALLM remain unchanged.
+            if (abaqus_mode .and. mecway_release_swap) then
+               call swap_mecway_release_axes(code_val)
             endif
 !
 !           Check if textpart(1) is an element number or ELSET name
@@ -620,3 +647,17 @@
          ierr = 1
       endif
       end subroutine parse_abaqus_release_code
+
+!
+!     Compatibility remapping for Mecway-generated *RELEASE lines.
+!     Abaqus M1/M2 bit positions remain unchanged in the solver.
+!
+      subroutine swap_mecway_release_axes(code)
+      implicit none
+      integer code, old_m1, old_m2
+      old_m1 = iand(code,16)
+      old_m2 = iand(code,32)
+      code = iand(code,15)
+      if (old_m1.ne.0) code = ior(code,32)
+      if (old_m2.ne.0) code = ior(code,16)
+      end subroutine swap_mecway_release_axes

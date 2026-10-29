@@ -63,3 +63,49 @@ In Abaqus, `*BEAM SECTION OFFSET` is associated with
 `*BEAM GENERAL SECTION` and specifies a cross-section origin shift.
 It is not interchangeable with independently varying member-end
 eccentricities. No change to offset syntax is included in this branch.
+
+## Optional Mecway release-axis compatibility (diagnostic)
+
+Some Mecway-generated B31T input decks have been observed to export the
+single-axis `rotv` and `rotw` releases using the opposite `M1`/`M2`
+labels relative to the local basis supplied in the `*BEAM SECTION` card.
+This is currently a **hypothesis awaiting a rerun against Mecway results**,
+not a verified general Mecway bug.
+
+To test without manually changing the exported `.inp`, enable this opt-in
+environment setting **before starting the CCX process**:
+
+```cmd
+set CCX_MECWAY_SWAP_RELEASE_AXES=1
+ccx_2.23.exe testb31t
+```
+
+For Mecway started through the Windows GUI, set a persistent **user**
+environment variable once using PowerShell, then close and reopen Mecway:
+
+```powershell
+[Environment]::SetEnvironmentVariable('CCX_MECWAY_SWAP_RELEASE_AXES', '1', 'User')
+```
+
+The setting swaps `M1` and `M2` (including `M1-T` and `M2-T`)
+**only** for standard `*RELEASE` lines. `T`, `M1-M2`, and `ALLM`
+remain unchanged. The `*USER BEAM RELEASE` extension is unaffected.
+
+**Important:** With this setting enabled, CCX intentionally interprets
+`*RELEASE` differently from standard Abaqus. Do **not** enable it for
+ordinary Abaqus decks or unrelated models. With the variable absent
+or set to another value, the original Abaqus-compatible behaviour is retained.
+To turn it off for the Windows GUI, remove the user environment variable:
+
+```powershell
+[Environment]::SetEnvironmentVariable('CCX_MECWAY_SWAP_RELEASE_AXES', $null, 'User')
+```
+
+Reopen Mecway after either environment change. This workaround does **not**
+convert legacy `B31` to `B31T` or fix missing Mecway B31T export support.
+Mecway's exporter remains the proper place for a permanent mapping fix.
+
+Regression: `validation/21_mecway_release_axis_swap.inp` is run with the
+setting both disabled and enabled in the Windows build workflow. Compare the
+resulting displacement fields to confirm the opt-in changes the released
+bending direction.
