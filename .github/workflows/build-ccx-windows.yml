@@ -28,6 +28,7 @@ jobs:
             perl
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-gcc-fortran
+            mingw-w64-x86_64-python
             mingw-w64-x86_64-spooles
             mingw-w64-x86_64-arpack
             mingw-w64-x86_64-openblas
