@@ -112,7 +112,7 @@ CCX-UB31/
 │   ├── usercodecheck.f           # Eurocode 3 & AISC 360-16 steel code check engine
 │   └── ...                       # Complete CalculiX C and Fortran source routines
 ├── validation/                   # Comprehensive standalone verification decks (.inp)
-│   ├── mecway_b31_alias.inp      # Standard B31/*BEAM SECTION → UB31 regression deck
+│   ├── mecway_b31_alias.inp      # Historical example; B31 now remains legacy CCX
 │   ├── 01_cantilever_static_rect.inp
 │   ├── 02_multisection_8profiles.inp
 │   ├── 03_member_releases_pinned_beam.inp
@@ -168,7 +168,7 @@ make -j$(nproc)
 
 ### Option 3: Using Precompiled Binaries (Linux / Windows)
 
-Precompiled standalone binaries with SPOOLES and ARPACK integrated are provided in the [`Release/`](Release/) directory. **These binaries predate the fork-specific Mecway `B31` compatibility patch. Rebuild from `src/` to use the new `B31` → UB31 behavior.**
+Precompiled standalone binaries with SPOOLES and ARPACK integrated are provided in the [`Release/`](Release/) directory. **Rebuild from `src/` for the current development-branch `B31T`/`B31E` implementations; the precompiled artifacts may predate the native interface and orientation corrections.**
 
 - **Linux (x86_64)**:
   ```bash
@@ -200,50 +200,47 @@ Precompiled standalone binaries with SPOOLES and ARPACK integrated are provided 
 
 ## ⚡ Quickstart Example Deck
 
-### Mecway-compatible / standard `B31` syntax
+### Mecway-compatible native `B31T` syntax
 
-For this fork, the preferred Mecway workflow is ordinary CalculiX-style input:
+Use `B31T` (or `B31E`) to request the direct, six-DOF beam
+formulations. The standard `B31` name remains the original CalculiX
+expanded beam and is **not** redirected.
 
 ```inp
-*HEADING
-B31 Cantilever - Routed Internally to UB31
 *NODE, NSET=NALL
-1,  0.0, 0.0, 0.0
-2,  1.0, 0.0, 0.0
-3,  2.0, 0.0, 0.0
-4,  3.0, 0.0, 0.0
-5,  4.0, 0.0, 0.0
-6,  5.0, 0.0, 0.0
-*ELEMENT, TYPE=B31, ELSET=EBEAM
+1, 0., 0., 0.
+2, 1., 0., 0.
+*ELEMENT, TYPE=B31T, ELSET=EBEAM
 1, 1, 2
-2, 2, 3
-3, 3, 4
-4, 4, 5
-5, 5, 6
 *MATERIAL, NAME=STEEL
 *ELASTIC
 2.1E11, 0.3
 *DENSITY
-7850.0
+7850.
 *BEAM SECTION, ELSET=EBEAM, MATERIAL=STEEL, SECTION=RECT
 0.1, 0.2
-0.0, 0.0, 1.0
+0.0, 0.0, -1.0
 *BOUNDARY
 1, 1, 6
 *STEP
 *STATIC
-*DLOAD
-EBEAM, P1, -5000.0
 *CLOAD
-6, 2, -10000.0
+2, 2, -10000.
 *NODE PRINT, NSET=NALL
 U, RF
-*EL PRINT, ELSET=EBEAM
-S
 *END STEP
 ```
 
-No `*USER ELEMENT` declaration and no `*USER BEAM SECTION` card are required for this compatibility path. Internally, `B31` is routed to UB31.
+For these native direct-beam types, section direction 1 and the
+dimension order follow CalculiX `*BEAM SECTION` conventions.
+Direction 1 defaults to `(0,0,-1)`; the local 2-direction is
+the beam tangent crossed with direction 1. A `RECT` section
+takes thicknesses along local 1 and local 2, in that order;
+`BOX` uses `a,b,t1,t2,t3,t4`; `CIRC` uses full diameters
+(`PIPE` uses outer radius and wall thickness).
+
+See [NATIVE_BEAM_INTERFACE.md](NATIVE_BEAM_INTERFACE.md) for the full
+axis convention, known limitations and regression checks.
 
 ### Original explicit UB31 syntax
 

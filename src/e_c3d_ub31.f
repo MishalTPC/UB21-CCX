@@ -266,50 +266,45 @@
          e1(j)=e1(j)/dl
       enddo
 !
-!     normalize input e2_in orientation vector or compute automatic upright orientation
+!     CalculiX *BEAM SECTION: supplied vector defines local 1 (e2).
+!     If omitted, its default is global (0,0,-1), not Z-up.
+!     Project local 1 into the plane perpendicular to the tangent.
 !
-      len_e2=dsqrt(e2_in(1)**2 + e2_in(2)**2 + e2_in(3)**2)
-      if (len_e2 .gt. 1.d-6) then
+      len_e2=dsqrt(e2_in(1)**2+e2_in(2)**2+e2_in(3)**2)
+      if(len_e2.gt.1.d-6) then
          do j=1,3
             e2(j)=e2_in(j)/len_e2
          enddo
-         c1 = e2(1)*e1(1) + e2(2)*e1(2) + e2(3)*e1(3)
-         do j=1,3
-            e2(j) = e2(j) - c1*e1(j)
-         enddo
-         len_e2=dsqrt(e2(1)**2 + e2(2)**2 + e2(3)**2)
-         if (len_e2 .lt. 1.d-6) then
-            ! Collinear with e1: fallback to auto upright orientation
-            if (dabs(e1(3)) .lt. 0.9999d0) then
-               e2(1)=-e1(2)
-               e2(2)= e1(1)
-               e2(3)= 0.d0
-            else
-               e2(1)=0.d0
-               e2(2)=1.d0
-               e2(3)=0.d0
-            endif
-            len_e2=dsqrt(e2(1)**2 + e2(2)**2 + e2(3)**2)
-         endif
-         do j=1,3
-            e2(j)=e2(j)/len_e2
-         enddo
       else
-         ! Auto-orientation: standard structural upright rule (Z up)
-         if (dabs(e1(3)) .lt. 0.9999d0) then
-            e2(1)=-e1(2)
-            e2(2)= e1(1)
-            e2(3)= 0.d0
-            len_e2=dsqrt(e2(1)**2 + e2(2)**2)
-            do j=1,3
-               e2(j)=e2(j)/len_e2
-            enddo
-         else
-            e2(1)=0.d0
-            e2(2)=1.d0
-            e2(3)=0.d0
-         endif
+         e2(1)=0.d0
+         e2(2)=0.d0
+         e2(3)=-1.d0
       endif
+      c1=e2(1)*e1(1)+e2(2)*e1(2)+e2(3)*e1(3)
+      do j=1,3
+         e2(j)=e2(j)-c1*e1(j)
+      enddo
+      len_e2=dsqrt(e2(1)**2+e2(2)**2+e2(3)**2)
+      if(len_e2.lt.1.d-6) then
+!        The supplied/default vector is parallel to the tangent.
+!        Choose a deterministic transverse fallback.
+         e2(1)=0.d0
+         e2(2)=0.d0
+         e2(3)=0.d0
+         if(dabs(e1(2)).lt.0.9d0) then
+            e2(2)=1.d0
+         else
+            e2(1)=1.d0
+         endif
+         c1=e2(1)*e1(1)+e2(2)*e1(2)+e2(3)*e1(3)
+         do j=1,3
+            e2(j)=e2(j)-c1*e1(j)
+         enddo
+         len_e2=dsqrt(e2(1)**2+e2(2)**2+e2(3)**2)
+      endif
+      do j=1,3
+         e2(j)=e2(j)/len_e2
+      enddo
 !
 !     apply section rotation angle + principal axes rotation angle
 !
@@ -410,53 +405,50 @@
          e1_curr(j)=e1_curr(j)/len_curr
       enddo
 
-!     initial e2_init
-      len_e2=dsqrt(e2_in(1)**2 + e2_in(2)**2 + e2_in(3)**2)
-      if (len_e2 .gt. 1.d-6) then
+!     Initial local 1-axis with the same CalculiX convention.
+!     Use the initial (possibly offset) chord for the projection.
+      len_e2=dsqrt(e2_in(1)**2+e2_in(2)**2+e2_in(3)**2)
+      if(len_e2.gt.1.d-6) then
          do j=1,3
             e2_init(j)=e2_in(j)/len_e2
          enddo
-         c1 = e2_init(1)*e1_init(1)+e2_init(2)*e1_init(2)+
-     &        e2_init(3)*e1_init(3)
+      else
+         e2_init(1)=0.d0
+         e2_init(2)=0.d0
+         e2_init(3)=-1.d0
+      endif
+      c1=e2_init(1)*e1_init(1)+e2_init(2)*e1_init(2)+
+     &   e2_init(3)*e1_init(3)
+      do j=1,3
+         e2_init(j)=e2_init(j)-c1*e1_init(j)
+      enddo
+      len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+
+     &             e2_init(3)**2)
+      if(len_e2.lt.1.d-6) then
+         e2_init(1)=0.d0
+         e2_init(2)=0.d0
+         e2_init(3)=0.d0
+         if(dabs(e1_init(2)).lt.0.9d0) then
+            e2_init(2)=1.d0
+         else
+            e2_init(1)=1.d0
+         endif
+         c1=e2_init(1)*e1_init(1)+e2_init(2)*e1_init(2)+
+     &      e2_init(3)*e1_init(3)
          do j=1,3
             e2_init(j)=e2_init(j)-c1*e1_init(j)
          enddo
-         len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+e2_init(3)**2)
-         if (len_e2 .lt. 1.d-6) then
-            if (dabs(e1_init(3)) .lt. 0.9999d0) then
-               e2_init(1)=-e1_init(2)
-               e2_init(2)= e1_init(1)
-               e2_init(3)= 0.d0
-            else
-               e2_init(1)=0.d0
-               e2_init(2)=1.d0
-               e2_init(3)=0.d0
-            endif
-            len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+e2_init(3)**2)
-         endif
-         do j=1,3
-            e2_init(j)=e2_init(j)/len_e2
-         enddo
-      else
-         if (dabs(e1_init(3)) .lt. 0.9999d0) then
-            e2_init(1)=-e1_init(2)
-            e2_init(2)= e1_init(1)
-            e2_init(3)= 0.d0
-            len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2)
-            do j=1,3
-               e2_init(j)=e2_init(j)/len_e2
-            enddo
-         else
-            e2_init(1)=0.d0
-            e2_init(2)=1.d0
-            e2_init(3)=0.d0
-         endif
+         len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+
+     &                e2_init(3)**2)
       endif
-      if (dabs(rot_angle_total) .gt. 1.d-6) then
-         call rotate_vector_local(e2_init, e1_init, rot_angle_total,
+      do j=1,3
+         e2_init(j)=e2_init(j)/len_e2
+      enddo
+      if(dabs(rot_angle_total).gt.1.d-6) then
+         call rotate_vector_local(e2_init,e1_init,rot_angle_total,
      &                            e2_init)
       endif
-
+!
 !     rotate e2_init to e2_curr
       cross_e1(1)=e1_init(2)*e1_curr(3)-e1_init(3)*e1_curr(2)
       cross_e1(2)=e1_init(3)*e1_curr(1)-e1_init(1)*e1_curr(3)

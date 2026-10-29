@@ -40,9 +40,41 @@ The internal `T`/`E` marker is retained in `lakon(5:5)` and the UB31 kernel uses
 
 The native interface reuses the current UB31 section reader and therefore supports the section families already implemented there (`RECT`, `CIRC`, `PIPE`, `I`, `T`, `CHAN`, `L`, `BOX`). `SECTION=GENERAL` is not yet claimed as supported by this interface.
 
+### CalculiX section-axis and dimension conventions
+
+The direct beams now use the section-axis convention of CalculiX's
+`*BEAM SECTION` definition:
+
+- Longitudinal direction `t`: node 1 toward node 2.
+- Local 1 direction: the global orientation vector on the line after
+  the dimensions, projected perpendicular to `t`. If omitted, the
+  CalculiX default vector `(0,0,-1)` is used. A deterministic alternative
+  transverse direction is selected if this vector is parallel to the beam.
+- Local 2 direction: `t x local1` (right-handed).
+- `RECT`: first dimension along local 1, second along local 2.
+  Accordingly `I11=a*b^3/12` and `I22=b*a^3/12` for
+  `a=local1 thickness`, `b=local2 thickness`.
+- `CIRC`: full elliptical diameters in local 1 and local 2, as in CCX;
+  for a circle the two diameters are equal. The second defaults to the
+  first if omitted. `PIPE` instead uses outer radius and wall thickness.
+- `BOX`: dimensions `a,b,t1,t2,t3,t4`; `a` follows local 1 and `b`
+  follows local 2. Wall thicknesses `t1,t2,t3,t4` correspond to the
+  `+1,+2,-1,-2` faces. A zero wall remains a zero wall; the profile is
+  **not** silently converted into `CHAN`.
+
+The legacy `*USER BEAM SECTION, SECTION=CIRC` interface retains the
+earlier radius input to avoid changing existing explicit `UB31` decks.
+All other direct-beam section changes above also affect `UB31` when
+those formulations share the property routine.
+
+The automatic principal-axis transformation now uses the same positive
+rotation about `t` as the local-frame transformation. For nonsymmetric
+sections this is essential to avoid using inertia properties in a
+different frame from the stiffness matrix.
+
 ### Mecway open-section compatibility
 
-Mecway can encode an open channel as a six-value `SECTION=BOX` card with one web thickness equal to zero, for example:
+For example, an open BOX exported by Mecway can be represented by:
 
 ```text
 *BEAM SECTION, ELSET=E1, MATERIAL=C180X70, SECTION=BOX
@@ -50,8 +82,34 @@ Mecway can encode an open channel as a six-value `SECTION=BOX` card with one web
 0,0,1
 ```
 
-For native `B31T`/`B31E` elements, this pattern is detected automatically and mapped to the UB31 `CHAN` formulation when the top and bottom flange thicknesses match. The generic BOX property routine also avoids the closed-section torsion formula whenever a wall thickness is zero.
+The file is interpreted in CalculiX BOX dimension/wall order, including
+the zero fourth wall. The former implicit three-sided BOX -> CHAN
+conversion is removed because it could transpose section dimensions
+or lose which side was open. A different missing wall remains distinct.
 
-This compatibility only applies when Mecway actually writes a `*BEAM SECTION` card. If Mecway omits a section definition entirely for an unsupported geometric material type, CCX has no section dimensions to recover and cannot infer them safely.
+The direct-beam implementation still requires full numerical
+comparison against the original expanded CalculiX beam elements.
+The thin-walled torsion and shear factors, in particular for open or
+elliptical sections, are approximations and are **not** claims of
+full equivalence with the expanded solid formulation. Explicit
+`*NORMAL` per-node orientation is not yet implemented for these direct
+beam elements.
+
+If Mecway omits a section definition entirely, CCX has no geometric
+dimensions to infer; an explicit `*BEAM SECTION` card is required.
+
+### Regression checks
+
+The standalone source regression can be built and run from the repository root:
+
+```sh
+gfortran -ffixed-line-length-none -c src/e_c3d_ubeam_utils.f -o /tmp/ubeam_utils.o
+gfortran validation/test_ccx_beam_axes.f90 /tmp/ubeam_utils.o -o /tmp/ccx_beam_axes
+/tmp/ccx_beam_axes
+```
+
+It checks unequal RECT sections, a full-diameter ellipse, a centred
+closed BOX, mirrored open BOXes and the vanishing product of inertia
+after L-section principal-axis rotation.
 
 The implementation has source-level checks but still requires full rebuilt-CCX runtime regression before being considered production-ready.
