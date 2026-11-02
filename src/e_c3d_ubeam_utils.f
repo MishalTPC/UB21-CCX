@@ -77,7 +77,8 @@
       real*8 sect_type, dims(6), E, nu, A, Iyy, Izz, J, xk_y, xk_z,
      &  principal_angle
       real*8 b, h, d_o, d_i, r_o, r_i, t_f, t_w, pi,
-     &  b_mean, h_mean, t, Iyz, theta_p, Iyy_p, Izz_p
+     &  b_mean, h_mean, t, Iyz, theta_p, Iyy_p, Izz_p,
+     &  t_yp, t_yn, t_zp, t_zn
       real*8 rb(6), rh(6), ry(6), rz(6), b_t, t_t, b_b, t_b, b_max
       integer st
       
@@ -91,8 +92,10 @@
          b = dims(1)
          h = dims(2)
          A = b * h
-         Izz = (1.d0/12.d0) * b * (h**3)
-         Iyy = (1.d0/12.d0) * h * (b**3)
+         ! dims(1)=b along local 1/e2 (y); dims(2)=h along
+         ! local 2/e3 (z), as in CalculiX *BEAM SECTION.
+         Iyy = (1.d0/12.d0) * b * (h**3)
+         Izz = (1.d0/12.d0) * h * (b**3)
          
          if (b .le. h) then
             J = (1.d0/3.d0) * (b**3) * h * (1.d0 - 0.63d0 * (b/h) * 
@@ -127,6 +130,21 @@
             xk_y = 2.d0 * (1.d0 + nu) / (4.d0 + 3.d0 * nu)
          endif
          xk_z = xk_y
+
+      elseif (st .eq. 8) then
+         ! Native CalculiX SECTION=CIRC: full diameters along
+         ! local 1/e2 and local 2/e3.  Ellipse is supported.
+         b=dims(1)
+         h=dims(2)
+         A=pi*b*h/4.d0
+         Iyy=pi*b*h**3/64.d0
+         Izz=pi*h*b**3/64.d0
+!        Saint-Venant torsion constant of an elliptic cylinder.
+         J=pi*(b**3)*(h**3)/(16.d0*(b*b+h*h))
+!        Circular Cowper shear factor; elliptical shear corrections
+!        remain an approximation for non-circular sections.
+         xk_y=6.d0*(1.d0+nu)/(7.d0+6.d0*nu)
+         xk_z=xk_y
 
       elseif (st .eq. 3) then
          ! I-beam section (dims: h, b_top, t_f_top, b_bot, t_f_bot, t_w)
@@ -257,65 +275,64 @@
          xk_z = (rh(1)*rb(1)) / A
 
       elseif (st .eq. 7) then
-         ! Box section (dims: h, b, t1, t2, t3, t4)
-         ! h = overall height, b = overall width
-         ! t1=bot, t2=left web, t3=top, t4=right web
-         h = dims(1)
-         b = dims(2)
-         t_b = dims(3) ! t1
-         t_w = dims(4) ! t2
-         t_f = dims(5) ! t3
-         
-         ! Top flange
+         ! CalculiX BOX(a,b,t1,t2,t3,t4) convention:
+         ! a = overall local-1 (e2/y) size, b = local-2 (e3/z).
+         ! t1=+local1, t2=+local2, t3=-local1, t4=-local2.
+         ! Disjoint corner treatment avoids counting overlaps twice.
+         b = dims(1)
+         h = dims(2)
+         t_yp = dims(3)
+         t_zp = dims(4)
+         t_yn = dims(5)
+         t_zn = dims(6)
+
+         ! Positive local-2 (+z) wall.
          rb(1) = b
-         rh(1) = t_f
+         rh(1) = t_zp
          ry(1) = b/2.d0
-         rz(1) = h - t_f/2.d0
-         
-         ! Bottom flange
+         rz(1) = h-t_zp/2.d0
+
+         ! Negative local-2 (-z) wall.
          rb(2) = b
-         rh(2) = t_b
+         rh(2) = t_zn
          ry(2) = b/2.d0
-         rz(2) = t_b/2.d0
-         
-         ! Left web
-         rb(3) = t_w
-         rh(3) = h - t_f - t_b
-         ry(3) = t_w/2.d0
-         rz(3) = t_b + rh(3)/2.d0
-         
-         ! Right web
-         rb(4) = dims(6) ! t4
-         rh(4) = h - t_f - t_b
-         ry(4) = b - dims(6)/2.d0
-         rz(4) = t_b + rh(4)/2.d0
-         
-         call compute_composite_inertia(4, rb, rh, ry, rz, 
+         rz(2) = t_zn/2.d0
+
+         ! Negative local-1 (-y) wall, between the end walls.
+         rb(3) = t_yn
+         rh(3) = h-t_zp-t_zn
+         ry(3) = t_yn/2.d0
+         rz(3) = t_zn+rh(3)/2.d0
+
+         ! Positive local-1 (+y) wall.
+         rb(4) = t_yp
+         rh(4) = h-t_zp-t_zn
+         ry(4) = b-t_yp/2.d0
+         rz(4) = t_zn+rh(4)/2.d0
+
+         call compute_composite_inertia(4, rb, rh, ry, rz,
      &        A, Iyy, Izz, Iyz)
-         
-         h_mean = h - 0.5d0 * (t_f + t_b)
-         b_mean = b - 0.5d0 * (t_w + dims(6))
+
+         h_mean = h-0.5d0*(t_zp+t_zn)
+         b_mean = b-0.5d0*(t_yp+t_yn)
 !
-!        Closed boxes use the Bredt thin-wall torsion expression.
-!        Mecway may encode open sections as BOX with one or more wall
-!        thicknesses equal to zero.  In that case use the open thin-wall
-!        sum J = sum(b_i*t_i^3/3) rather than dividing by a zero wall.
+!        Closed BOX: thin-wall Bredt torsion approximation.
+!        For a three-sided/open BOX, use the open-wall sum.  Do not
+!        convert to CHAN: doing so discards which side is missing.
 !
-         if((t_f.gt.1.d-14).and.(t_b.gt.1.d-14).and.
-     &      (t_w.gt.1.d-14).and.(dims(6).gt.1.d-14)) then
-            J = 4.d0 * (h_mean * b_mean)**2 / 
-     &          (b_mean*(1.d0/t_f + 1.d0/t_b) + 
-     &           h_mean*(1.d0/t_w + 1.d0/dims(6)))
+         if((t_yp.gt.1.d-14).and.(t_yn.gt.1.d-14).and.
+     &      (t_zp.gt.1.d-14).and.(t_zn.gt.1.d-14)) then
+            J=4.d0*(h_mean*b_mean)**2/
+     &        (b_mean*(1.d0/t_zp+1.d0/t_zn)+
+     &         h_mean*(1.d0/t_yp+1.d0/t_yn))
          else
-            J = (1.d0/3.d0) * b * (t_f**3) +
-     &          (1.d0/3.d0) * b * (t_b**3) +
-     &          (1.d0/3.d0) * max(0.d0,h-t_f-t_b) * (t_w**3) +
-     &          (1.d0/3.d0) * max(0.d0,h-t_f-t_b) *
-     &          (dims(6)**3)
+            J=(1.d0/3.d0)*b*(t_zp**3+t_zn**3)+
+     &        (1.d0/3.d0)*max(0.d0,h-t_zp-t_zn)*
+     &         (t_yp**3+t_yn**3)
          endif
-         
-         xk_y = (rh(3)*rb(3) + rh(4)*rb(4)) / A
-         xk_z = (rb(1)*rh(1) + rb(2)*rh(2)) / A
+
+         xk_y = (rh(3)*rb(3)+rh(4)*rb(4))/A
+         xk_z = (rb(1)*rh(1)+rb(2)*rh(2))/A
 
       else
          ! Fallback rectangular
@@ -329,15 +346,17 @@
 
       ! Rotate to principal coordinates if asymmetrical (Iyz is non-zero)
       if (dabs(Iyz) .gt. 1.d-12) then
-         theta_p = 0.5d0 * datan2(2.d0 * Iyz, Iyy - Izz)
-         principal_angle = theta_p * 180.d0 / pi
-         
-         ! Principal moments of inertia
-         Iyy_p = 0.5d0*(Iyy + Izz) + 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) + 
+         ! Local axes are rotated positively about the tangent.
+         ! Use a matching passive transformation of the section tensor.
+         ! Iyz is the positive geometric product integral(y*z*dA).
+         theta_p = 0.5d0*datan2(-2.d0*Iyz, Iyy-Izz)
+         principal_angle = theta_p*180.d0/pi
+
+         Iyy_p = 0.5d0*(Iyy+Izz)+
+     &           0.5d0*(Iyy-Izz)*dcos(2.d0*theta_p)-
      &           Iyz*dsin(2.d0*theta_p)
-         Izz_p = 0.5d0*(Iyy + Izz) - 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) - 
+         Izz_p = 0.5d0*(Iyy+Izz)-
+     &           0.5d0*(Iyy-Izz)*dcos(2.d0*theta_p)+
      &           Iyz*dsin(2.d0*theta_p)
          
          Iyy = Iyy_p

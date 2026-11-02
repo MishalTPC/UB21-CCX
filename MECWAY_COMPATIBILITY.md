@@ -26,7 +26,20 @@ This retains native-readable CalculiX-style input for preprocessors while avoidi
 
 For a transparent Mecway workflow, the preferred long-term integration is for the exporter to emit `B31T` or `B31E` when the direct beam formulation is selected. If Mecway currently emits only `B31`, exporter support is required rather than overriding CalculiX's existing `B31` semantics.
 
-See `NATIVE_BEAM_INTERFACE.md` and validation decks 16-18.
+### Orientation and section properties
+
+Mecway's section-orientation vector is treated as the approximate local
+**1-direction**, as in CalculiX. The default is `(0,0,-1)` and local
+2 is the tangent crossed with local 1. On `*BEAM SECTION`, the first
+`RECT` dimension lies along local 1, the second along local 2.
+
+For `BOX` the first two dimensions are the extents along local
+1 and local 2; `t1,t2,t3,t4` are the wall thicknesses at `+1,+2,-1,-2`
+respectively. Open sections emitted by Mecway as a BOX with one wall of
+zero thickness remain BOX sections rather than being remapped to an
+arbitrarily oriented channel.
+
+See `NATIVE_BEAM_INTERFACE.md` and validation decks 16-19.
 
 ## Validation status
 
