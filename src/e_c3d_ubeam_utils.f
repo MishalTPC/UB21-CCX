@@ -327,19 +327,18 @@
          xk_z = 0.85d0
       endif
 
-      ! Rotate to principal coordinates if asymmetrical (Iyz is non-zero)
-      if (dabs(Iyz) .gt. 1.d-12) then
-         theta_p = 0.5d0 * datan2(2.d0 * Iyz, Iyy - Izz)
-         principal_angle = theta_p * 180.d0 / pi
-         
-         ! Principal moments of inertia
-         Iyy_p = 0.5d0*(Iyy + Izz) + 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) + 
+      ! Positive local-axis rotation follows right-hand rule.
+      ! Principal-axis angle must cancel the mixed area moment Iyz.
+      ! Old sign interchanged major/minor physical bending axes.
+      if (dabs(Iyz).gt.1.d-12*max(dabs(Iyy),dabs(Izz))) then
+         theta_p = -0.5d0*datan2(2.d0*Iyz,Iyy-Izz)
+         principal_angle = theta_p*180.d0/pi
+         Iyy_p = 0.5d0*(Iyy+Izz) +
+     &           0.5d0*(Iyy-Izz)*dcos(2.d0*theta_p) -
      &           Iyz*dsin(2.d0*theta_p)
-         Izz_p = 0.5d0*(Iyy + Izz) - 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) - 
+         Izz_p = 0.5d0*(Iyy+Izz) -
+     &           0.5d0*(Iyy-Izz)*dcos(2.d0*theta_p) +
      &           Iyz*dsin(2.d0*theta_p)
-         
          Iyy = Iyy_p
          Izz = Izz_p
       endif

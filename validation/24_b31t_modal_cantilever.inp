@@ -1,0 +1,29 @@
+*HEADING
+B31T four-element modal cantilever; compare against same geometry B31E
+*NODE
+1, 0., 0., 0.
+2, 0.5, 0., 0.
+3, 1., 0., 0.
+4, 1.5, 0., 0.
+5, 2., 0., 0.
+*ELEMENT, TYPE=B31T, ELSET=BEAM
+1, 1, 2
+2, 2, 3
+3, 3, 4
+4, 4, 5
+*MATERIAL, NAME=STEEL
+*ELASTIC
+2.1E11, 0.3
+*DENSITY
+7850.
+*BEAM SECTION, ELSET=BEAM, MATERIAL=STEEL, SECTION=RECT
+0.20, 0.20
+0., 1., 0.
+*BOUNDARY
+1, 1, 6
+*STEP
+*FREQUENCY
+6
+*NODE FILE
+U
+*END STEP

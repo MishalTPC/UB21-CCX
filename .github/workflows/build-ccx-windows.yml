@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - dev
+      - 'fix/beam-section-modal-validation-20261105'
     paths:
       - 'src/**'
       - 'validation/**'
@@ -103,9 +104,32 @@ jobs:
           grep -q 'Mecway release axis compatibility' compat.log
           python "$GITHUB_WORKSPACE/validation/check_mecway_release_swap.py" normal.frd compat.frd
 
+      - name: Angle principal-axis cross-coupling regression
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/principal-axes
+          cp dist/windows/* smoke/principal-axes/
+          cp validation/22_b31e_angle_principal_axes.inp smoke/principal-axes/
+          cd smoke/principal-axes
+          ./ccx_2.23.exe 22_b31e_angle_principal_axes
+          python "$GITHUB_WORKSPACE/validation/check_angle_principal_axes.py" 22_b31e_angle_principal_axes.frd
+
+      - name: B31E and B31T modal extraction smoke tests
+        shell: msys2 {0}
+        run: |
+          mkdir -p smoke/beam-modes
+          cp dist/windows/* smoke/beam-modes/
+          cp validation/23_b31e_modal_cantilever.inp smoke/beam-modes/
+          cp validation/24_b31t_modal_cantilever.inp smoke/beam-modes/
+          cd smoke/beam-modes
+          ./ccx_2.23.exe 23_b31e_modal_cantilever
+          ./ccx_2.23.exe 24_b31t_modal_cantilever
+          test -s 23_b31e_modal_cantilever.dat
+          test -s 24_b31t_modal_cantilever.dat
+
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: ccx-2.23-ub31-windows-x86_64
+          name: ccx-2.23-beam-validation-windows-x86_64
           path: dist/windows/
           if-no-files-found: error

@@ -74,7 +74,7 @@
      &  rot_angle_total, e, un, um, xl(3,2), e1(3), e2(3), e3(3),
      &  dl, c1, tm(3,3), t0l, t1l, elconloc(ncmat_), rho, stiff(21),
      &  coords(3), eth(6), plconloc(802),
-     &  xstiff_pt(27), a, xi11, xi22, xk_y, xk_z,
+     &  xstiff_pt(27), a, xi11, xi22, xk_y, xk_z, timo_val,
      &  xl_def(3,2),e1_init(3),e1_curr(3),len_init,len_curr,
      &  cross_e1(3),dot_e1,u_rot(3),cross_u(3),dot_u_e2,len_cross,
      &  e2_init(3), e3_init(3), off_vec(3), rot_disp(3),
@@ -472,7 +472,24 @@
       s(1,7) = -s(1,1)
       s(7,7) = s(1,1)
 
-      phi_z = 12.d0 * e * xi11 / (um * a * xk_y * dl**2)
+!
+!     Force recovery must match assembled beam formulation.
+!     Native B31E uses Euler-Bernoulli (zero shear flexibility).
+!     Native B31T uses section shear factors. UB31 respects KAPPA.
+!
+      timo_val=prop(index+20)
+      if (lakon(nelem)(5:5).eq.'T') timo_val=0.d0
+      if (lakon(nelem)(5:5).eq.'E') timo_val=-1.d0
+      if (timo_val.lt.-1.d-6) then
+         phi_z=0.d0
+         phi_y=0.d0
+      elseif (timo_val.gt.1.d-6) then
+         phi_z=12.d0*e*xi11/(um*a*timo_val*dl**2)
+         phi_y=12.d0*e*xi22/(um*a*timo_val*dl**2)
+      else
+         phi_z=12.d0*e*xi11/(um*a*xk_y*dl**2)
+         phi_y=12.d0*e*xi22/(um*a*xk_z*dl**2)
+      endif
       s(2,2) = 12.d0*e*xi11/((1.d0 + phi_z)*(dl**3))
       s(2,6) = 6.d0*e*xi11/((1.d0 + phi_z)*(dl**2))
       s(2,8) = -s(2,2)
@@ -486,7 +503,6 @@
       s(8,12) = -s(2,6)
       s(12,12) = s(6,6)
 
-      phi_y = 12.d0 * e * xi22 / (um * a * xk_z * dl**2)
       s(3,3) = 12.d0*e*xi22/((1.d0 + phi_y)*(dl**3))
       s(3,5) = -6.d0*e*xi22/((1.d0 + phi_y)*(dl**2))
       s(3,9) = -s(3,3)
