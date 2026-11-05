@@ -36,3 +36,31 @@ WARNING: experimental engineering solver. Nonlinear response,
 eccentric offsets/end-release combinations, noncircular torsional
 stresses, open-section shear coefficients, and production modal accuracy
 are not comprehensively validated in this branch.
+
+## Open-section Saint-Venant torsion update
+
+The open-section I/T/channel/angle torsion constant now comes from a
+numerical solution of the Prandtl stress-function equation on the
+cross-section, using a uniform finite-difference grid and conjugate
+gradients. Repeated section dimensions are cached. The previous
+thin-wall plate-sum formula remains an automatic fallback for
+unsupported or oversized grids.
+
+Set `CCX_LEGACY_OPEN_TORSION=1` in the environment to recover the
+previous torsion constants for A/B comparisons in the same executable.
+This does not change `A`, `Iyy`, `Izz`, or material properties.
+
+For the supplied approximate dimensions, numerically computed J:
+- C180x70 (h=180mm,b=70mm,tf=11mm,tw=8mm):
+  8.50335e-8 m^4 (previous 8.74067e-8)
+- L70x70x8: 2.19566e-8 m^4 (previous 2.2528e-8).
+
+Independent frame model indicates this reduces the original
+approximately 3.4% displacement discrepancy to approximately 1.26%.
+The residual is **not** yet explained. This is an experimental solver
+correction, not a claim of full Mecway parity or production readiness.
+
+The idealized section model does not capture fillet radii, cold-formed
+corner rounding, welds, or warping effects. For full accuracy, section
+properties and eccentricities should ultimately be matched with the
+reference solver.

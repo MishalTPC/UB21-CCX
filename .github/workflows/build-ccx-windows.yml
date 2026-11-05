@@ -104,6 +104,12 @@ jobs:
           grep -q 'Mecway release axis compatibility' compat.log
           python "$GITHUB_WORKSPACE/validation/check_mecway_release_swap.py" normal.frd compat.frd
 
+      - name: Numerical open-section torsion regression
+        shell: msys2 {0}
+        run: |
+          gfortran -O2 -fopenmp -o torsion_check.exe validation/26_check_open_torsion.f src/e_c3d_ubeam_utils.f
+          ./torsion_check.exe
+
       - name: Angle principal-axis cross-coupling regression
         shell: msys2 {0}
         run: |

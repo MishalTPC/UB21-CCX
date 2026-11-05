@@ -327,6 +327,16 @@
          xk_z = 0.85d0
       endif
 
+!
+!     Numerical Saint-Venant torsion for open thin-walled sections.
+!     Old summed rectangular-plate J neglects flange/web junction
+!     interaction and finite wall aspect ratios.
+!     Keep a legacy switch for direct A/B comparison.
+!
+      if(st.ge.3.and.st.le.6)then
+         call cached_open_section_torsion(st,dims,J)
+      endif
+!
       ! Positive local-axis rotation follows right-hand rule.
       ! Principal-axis angle must cancel the mixed area moment Iyz.
       ! Old sign interchanged major/minor physical bending axes.
@@ -467,4 +477,201 @@
             endif
          endif
       enddo
+      end subroutine
+
+!
+!     Cached numerical Saint-Venant torsion for open sections.
+!     A full solve is performed only once per unique profile.
+!     OpenMP critical protects SAVE data and the first calculation.
+!     Use CCX_LEGACY_OPEN_TORSION=1 for previous thin-wall formula.
+!
+      subroutine cached_open_section_torsion(st,dims,J)
+      implicit none
+      integer st,i,k,ncache,istat
+      integer,save:: cache_st(128),cache_count=0
+      real*8 dims(6),J,jcalc
+      real*8,save:: cache_dim(6,128),cache_j(128)
+      logical matched
+      character(len=12):: env
+      call get_environment_variable('CCX_LEGACY_OPEN_TORSION',
+     &     env,status=istat)
+      if(istat.eq.0)then
+         if(env(1:1).eq.'1')return
+      endif
+!$omp critical(ub31_open_torsion_cache)
+      ncache=cache_count
+      matched=.false.
+      do i=1,ncache
+         if(cache_st(i).ne.st)cycle
+         matched=.true.
+         do k=1,6
+            if(dabs(cache_dim(k,i)-dims(k)).gt.
+     &         1.d-12*max(1.d0,dabs(dims(k))))then
+               matched=.false.
+               exit
+            endif
+         enddo
+         if(matched)then
+            J=cache_j(i)
+            exit
+         endif
+      enddo
+      if(.not.matched)then
+         call open_section_torsion(st,dims,jcalc)
+         if(jcalc.gt.0.d0)then
+            J=jcalc
+            if(cache_count.lt.128)then
+               cache_count=cache_count+1
+               cache_st(cache_count)=st
+               cache_dim(:,cache_count)=dims(:)
+               cache_j(cache_count)=J
+            endif
+         endif
+      endif
+!$omp end critical(ub31_open_torsion_cache)
+      end subroutine
+
+!
+!     Prandtl stress-function formulation:
+!       laplacian(psi)=-2, psi=0 on section boundary;
+!       J = 2 * integral(psi) dA.
+!     The boundary follows a union of rectangles. A five-point
+!     finite-difference discretization uses ~32 cells/minimum wall
+!     thickness, solved by conjugate gradient. Unsupported/large
+!     grids return -1, preserving the analytical approximation.
+!
+      subroutine open_section_torsion(st,dims,j_num)
+      implicit none
+      integer st,nx,ny,i,k,iter,limit,istat
+      real*8 dims(6),j_num,b,h,t1,t2,tw,bt,bb,
+     &    dx,x,z,ctr,r0,r1,rr,pap,alpha,beta,ss,tol
+      logical,allocatable :: body(:,:),free(:,:)
+      real*8,allocatable :: u(:,:),r(:,:),p(:,:),ap(:,:)
+      j_num=-1.d0
+      if(st.eq.3)then
+         h=dims(1)
+         bt=dims(2)
+         bb=dims(4)
+         b=max(bt,bb)
+         t1=dims(3)
+         t2=dims(5)
+         tw=dims(6)
+         ss=min(t1,t2,tw)
+      elseif(st.eq.4)then
+         h=dims(1)
+         b=dims(2)
+         t1=dims(3)
+         tw=dims(4)
+         ss=min(t1,tw)
+      elseif(st.eq.5)then
+         h=dims(1)
+         b=dims(2)
+         t1=dims(3)
+         tw=dims(4)
+         ss=min(t1,tw)
+      elseif(st.eq.6)then
+         b=dims(1)
+         h=dims(2)
+         tw=dims(3)
+         ss=tw
+      else
+         return
+      endif
+      if(b.le.0.d0.or.h.le.0.d0.or.ss.le.0.d0)return
+      dx=ss/32.d0
+      nx=nint(b/dx)+1
+      if(nx.lt.5)return
+      dx=b/dble(nx-1)
+      ny=nint(h/dx)+1
+      if(ny.lt.5.or.dble(nx)*dble(ny).gt.1.5d6)
+     &   return
+      allocate(body(nx,ny),free(nx,ny),u(nx,ny),
+     &         r(nx,ny),p(nx,ny),ap(nx,ny),stat=istat)
+      if(istat.ne.0)return
+      body=.false.
+      free=.false.
+      u=0.d0
+      r=0.d0
+      p=0.d0
+      ap=0.d0
+      do k=1,ny
+         z=dble(k-1)*dx
+         do i=1,nx
+            x=dble(i-1)*dx
+            if(st.eq.3)then
+               ctr=b/2.d0
+               body(i,k)=(z.ge.h-t1.and.
+     &             dabs(x-ctr).le.bt/2.d0).or.
+     &             (z.le.t2.and.
+     &             dabs(x-ctr).le.bb/2.d0).or.
+     &             (dabs(x-ctr).le.tw/2.d0)
+            elseif(st.eq.4)then
+               body(i,k)=z.ge.h-t1.or.
+     &             dabs(x-b/2.d0).le.tw/2.d0
+            elseif(st.eq.5)then
+               body(i,k)=z.le.t1.or.z.ge.h-t1.or.x.le.tw
+            elseif(st.eq.6)then
+               body(i,k)=z.le.tw.or.x.le.tw
+            endif
+            if(z.gt.h)body(i,k)=.false.
+         enddo
+      enddo
+      do k=2,ny-1
+         do i=2,nx-1
+            free(i,k)=body(i,k).and.body(i-1,k).and.
+     &        body(i+1,k).and.body(i,k-1).and.body(i,k+1)
+            if(free(i,k))then
+               r(i,k)=2.d0*dx*dx
+               p(i,k)=r(i,k)
+            endif
+         enddo
+      enddo
+      r0=0.d0
+      do k=2,ny-1
+         do i=2,nx-1
+            if(free(i,k))r0=r0+r(i,k)**2
+         enddo
+      enddo
+      if(r0.le.1.d-80)then
+         deallocate(body,free,u,r,p,ap)
+         return
+      endif
+      rr=r0
+      r1=r0
+      tol=1.d-14*r0
+      limit=4*(nx+ny)
+      do iter=1,limit
+         pap=0.d0
+         do k=2,ny-1
+            do i=2,nx-1
+               if(free(i,k))then
+                  ap(i,k)=4.d0*p(i,k)-p(i-1,k)-p(i+1,k)-
+     &              p(i,k-1)-p(i,k+1)
+                  pap=pap+p(i,k)*ap(i,k)
+               endif
+            enddo
+         enddo
+         if(pap.le.1.d-80)exit
+         alpha=rr/pap
+         r1=0.d0
+         do k=2,ny-1
+            do i=2,nx-1
+               if(free(i,k))then
+                  u(i,k)=u(i,k)+alpha*p(i,k)
+                  r(i,k)=r(i,k)-alpha*ap(i,k)
+                  r1=r1+r(i,k)*r(i,k)
+               endif
+            enddo
+         enddo
+         if(r1.lt.tol)exit
+         beta=r1/rr
+         rr=r1
+         do k=2,ny-1
+            do i=2,nx-1
+               if(free(i,k))p(i,k)=r(i,k)+beta*p(i,k)
+            enddo
+         enddo
+      enddo
+      if(r1.le.1.d-8*r0)j_num=2.d0*sum(u)*dx*dx
+      deallocate(body,free,u,r,p,ap)
       end subroutine
