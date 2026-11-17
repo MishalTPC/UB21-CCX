@@ -74,7 +74,7 @@
      &  w1, w2, alpha, beta, f1, f2, m1, m2
       integer release_codes(2), code, inode, r,
      &  load_type, load_dir, a_pct, b_pct, node1, node2,
-     &  lumped_flag, env_stat, node_id
+     &  lumped_flag, env_stat, node_id, iorient_error
       character(len=10) :: env_lump
       logical released(12)
       real*8 spring_k(12)
@@ -266,49 +266,12 @@
          e1(j)=e1(j)/dl
       enddo
 !
-!     normalize input e2_in orientation vector or compute automatic upright orientation
-!
-      len_e2=dsqrt(e2_in(1)**2 + e2_in(2)**2 + e2_in(3)**2)
-      if (len_e2 .gt. 1.d-6) then
-         do j=1,3
-            e2(j)=e2_in(j)/len_e2
-         enddo
-         c1 = e2(1)*e1(1) + e2(2)*e1(2) + e2(3)*e1(3)
-         do j=1,3
-            e2(j) = e2(j) - c1*e1(j)
-         enddo
-         len_e2=dsqrt(e2(1)**2 + e2(2)**2 + e2(3)**2)
-         if (len_e2 .lt. 1.d-6) then
-            ! Collinear with e1: fallback to auto upright orientation
-            if (dabs(e1(3)) .lt. 0.9999d0) then
-               e2(1)=-e1(2)
-               e2(2)= e1(1)
-               e2(3)= 0.d0
-            else
-               e2(1)=0.d0
-               e2(2)=1.d0
-               e2(3)=0.d0
-            endif
-            len_e2=dsqrt(e2(1)**2 + e2(2)**2 + e2(3)**2)
-         endif
-         do j=1,3
-            e2(j)=e2(j)/len_e2
-         enddo
-      else
-         ! Auto-orientation: standard structural upright rule (Z up)
-         if (dabs(e1(3)) .lt. 0.9999d0) then
-            e2(1)=-e1(2)
-            e2(2)= e1(1)
-            e2(3)= 0.d0
-            len_e2=dsqrt(e2(1)**2 + e2(2)**2)
-            do j=1,3
-               e2(j)=e2(j)/len_e2
-            enddo
-         else
-            e2(1)=0.d0
-            e2(2)=1.d0
-            e2(3)=0.d0
-         endif
+!     Native CCX section normal; explicit input is projected.
+      call ccx_beam_section_normal(e1,e2_in,e2,iorient_error)
+      if(iorient_error.ne.0) then
+         write(*,*) '*ERROR: beam section axis parallel'
+         write(*,*) '  to element tangent (element ',nelem,')'
+         call exit(201)
       endif
 !
 !     apply section rotation angle + principal axes rotation angle
@@ -410,50 +373,16 @@
          e1_curr(j)=e1_curr(j)/len_curr
       enddo
 
-!     initial e2_init
-      len_e2=dsqrt(e2_in(1)**2 + e2_in(2)**2 + e2_in(3)**2)
-      if (len_e2 .gt. 1.d-6) then
-         do j=1,3
-            e2_init(j)=e2_in(j)/len_e2
-         enddo
-         c1 = e2_init(1)*e1_init(1)+e2_init(2)*e1_init(2)+
-     &        e2_init(3)*e1_init(3)
-         do j=1,3
-            e2_init(j)=e2_init(j)-c1*e1_init(j)
-         enddo
-         len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+e2_init(3)**2)
-         if (len_e2 .lt. 1.d-6) then
-            if (dabs(e1_init(3)) .lt. 0.9999d0) then
-               e2_init(1)=-e1_init(2)
-               e2_init(2)= e1_init(1)
-               e2_init(3)= 0.d0
-            else
-               e2_init(1)=0.d0
-               e2_init(2)=1.d0
-               e2_init(3)=0.d0
-            endif
-            len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2+e2_init(3)**2)
-         endif
-         do j=1,3
-            e2_init(j)=e2_init(j)/len_e2
-         enddo
-      else
-         if (dabs(e1_init(3)) .lt. 0.9999d0) then
-            e2_init(1)=-e1_init(2)
-            e2_init(2)= e1_init(1)
-            e2_init(3)= 0.d0
-            len_e2=dsqrt(e2_init(1)**2+e2_init(2)**2)
-            do j=1,3
-               e2_init(j)=e2_init(j)/len_e2
-            enddo
-         else
-            e2_init(1)=0.d0
-            e2_init(2)=1.d0
-            e2_init(3)=0.d0
-         endif
+!     Reconstruct undeformed axes using the same convention.
+      call ccx_beam_section_normal(e1_init,e2_in,e2_init,
+     &                             iorient_error)
+      if(iorient_error.ne.0) then
+         write(*,*) '*ERROR: invalid initial beam section axis'
+         write(*,*) '  element ',nelem
+         call exit(201)
       endif
       if (dabs(rot_angle_total) .gt. 1.d-6) then
-         call rotate_vector_local(e2_init, e1_init, rot_angle_total,
+         call rotate_vector_local(e2_init,e1_init,rot_angle_total,
      &                            e2_init)
       endif
 

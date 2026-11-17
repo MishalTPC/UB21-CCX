@@ -91,8 +91,8 @@
          b = dims(1)
          h = dims(2)
          A = b * h
-         Izz = (1.d0/12.d0) * b * (h**3)
-         Iyy = (1.d0/12.d0) * h * (b**3)
+         Iyy = (1.d0/12.d0) * b * (h**3)
+         Izz = (1.d0/12.d0) * h * (b**3)
          
          if (b .le. h) then
             J = (1.d0/3.d0) * (b**3) * h * (1.d0 - 0.63d0 * (b/h) * 
@@ -317,29 +317,39 @@
          xk_y = (rh(3)*rb(3) + rh(4)*rb(4)) / A
          xk_z = (rb(1)*rh(1) + rb(2)*rh(2)) / A
 
+      elseif (st .eq. 8) then
+!        CCX CIRC elliptical section, semiaxes along section n1/n2.
+         b=dims(1)
+         h=dims(2)
+         if(b.le.0.d0.or.h.le.0.d0) then
+            write(*,*) '*ERROR: invalid elliptical section'
+            call exit(201)
+         endif
+         A=pi*b*h
+         Iyy=pi*b*h**3/4.d0
+         Izz=pi*h*b**3/4.d0
+         J=pi*b**3*h**3/(b*b+h*h)
+!        Approximate Cowper shear factor; ellipse needs verification.
+         xk_y=6.d0*(1.d0+nu)/(7.d0+6.d0*nu)
+         xk_z=xk_y
       else
-         ! Fallback rectangular
-         A = 0.01d0
-         Izz = 8.33d-6
-         Iyy = 8.33d-6
-         J = 1.41d-5
-         xk_y = 0.85d0
-         xk_z = 0.85d0
+         write(*,*) '*ERROR: unknown UB31 section ',st
+         call exit(201)
       endif
 
       ! Rotate to principal coordinates if asymmetrical (Iyz is non-zero)
       if (dabs(Iyz) .gt. 1.d-12) then
-         theta_p = 0.5d0 * datan2(2.d0 * Iyz, Iyy - Izz)
+         theta_p = 0.5d0 * datan2(-2.d0 * Iyz, Iyy - Izz)
          principal_angle = theta_p * 180.d0 / pi
          
          ! Principal moments of inertia
-         Iyy_p = 0.5d0*(Iyy + Izz) + 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) + 
+         Iyy_p = 0.5d0*(Iyy + Izz) +
+     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) -
      &           Iyz*dsin(2.d0*theta_p)
-         Izz_p = 0.5d0*(Iyy + Izz) - 
-     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) - 
+         Izz_p = 0.5d0*(Iyy + Izz) -
+     &           0.5d0*(Iyy - Izz)*dcos(2.d0*theta_p) +
      &           Iyz*dsin(2.d0*theta_p)
-         
+
          Iyy = Iyy_p
          Izz = Izz_p
       endif
@@ -469,3 +479,34 @@
          endif
       enddo
       end subroutine
+!     Orient the first section axis using the CalculiX convention.
+!     A missing direction is treated as (0,0,-1); a parallel
+!     direction is invalid (no arbitrary "upright" fallback).
+      subroutine ccx_beam_section_normal(t,provided,n1,ierr)
+      implicit none
+      real*8 t(3),provided(3),n1(3),p(3),m,dotval
+      integer ierr,j
+      ierr=0
+      m=dsqrt(provided(1)**2+provided(2)**2+provided(3)**2)
+      if(m.le.1.d-12) then
+         p(1)=0.d0
+         p(2)=0.d0
+         p(3)=-1.d0
+      else
+         do j=1,3
+            p(j)=provided(j)/m
+         enddo
+      endif
+      dotval=p(1)*t(1)+p(2)*t(2)+p(3)*t(3)
+      do j=1,3
+         n1(j)=p(j)-dotval*t(j)
+      enddo
+      m=dsqrt(n1(1)**2+n1(2)**2+n1(3)**2)
+      if(m.lt.1.d-8) then
+         ierr=1
+         return
+      endif
+      do j=1,3
+         n1(j)=n1(j)/m
+      enddo
+      end subroutine ccx_beam_section_normal

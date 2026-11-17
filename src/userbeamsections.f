@@ -47,7 +47,7 @@
 !
       implicit none
 !
-      logical nodalthickness
+      logical nodalthickness, native_section
 !
       character*1 inpc(*)
       character*4 section
@@ -69,6 +69,7 @@
 !
       real*8 thicke(mi(3),*),thickness1,thickness2,p(3),xnor(*),
      &  offset(2,*),offset1,offset2,dd,dims_temp(6),sect_type_val,
+     &  original_dims(6),
      &  prop(*), off1(3), off2(3), off3(3), rel1, rel2, rel3,
      &  rot_angle_val, timo_val, custom_k, open_tol, flange_tol
 !
@@ -91,6 +92,7 @@
       timo_val=0.d0
       orientation='                                               '
       section='    '
+      native_section=(textpart(1)(1:13).eq.'*BEAM SECTION')
       ipos=1
 !
       header_str = ' '
@@ -265,61 +267,101 @@
          endif
       enddo
 !
-!     Finalize section type.  Mecway can export an open C/channel section
-!     as SECTION=BOX using:
-!       h,b,t_bottom,t_left,t_top,0
-!     or the mirrored form:
-!       h,b,t_bottom,0,t_top,t_right
-!     If top and bottom flange thicknesses agree, map this directly to the
-!     UB31 CHAN formulation instead of evaluating a singular closed box.
-!
+!     Native *BEAM SECTION geometry matches CCX rather than a
+!     bespoke Mecway BOX arrangement. USER BEAM SECTION stays legacy.
+      if(native_section.and.section.eq.'RECT'.and.n.eq.1) then
+         dims_temp(2)=dims_temp(1)
+      endif
+      if(native_section.and.section.eq.'BOX ') then
+!        CCX: a(n1), b(n2), t1(right), t2(top), t3(left), t4(bottom)
+!        UB31 internal: h, width, bottom, left, top, right.
+         do m=1,6
+            original_dims(m)=dims_temp(m)
+         enddo
+         dims_temp(1)=original_dims(2)
+         dims_temp(2)=original_dims(1)
+         dims_temp(3)=original_dims(6)
+         dims_temp(4)=original_dims(5)
+         dims_temp(5)=original_dims(4)
+         dims_temp(6)=original_dims(3)
+      endif
       open_tol=1.d-12*max(1.d0,dabs(dims_temp(1)),
      &                        dabs(dims_temp(2)))
       flange_tol=1.d-8*max(1.d0,dabs(dims_temp(3)),
      &                          dabs(dims_temp(5)))
-!
-      if (section .eq. 'RECT') then
-         sect_type_val = 1.d0
-      elseif (section .eq. 'CIRC') then
-         sect_type_val = 2.d0
-      elseif (section .eq. 'PIPE') then
-         sect_type_val = 2.d0
-      elseif (section .eq. 'I   ') then
-         sect_type_val = 3.d0
-      elseif (section .eq. 'T   ') then
-         sect_type_val = 4.d0
-      elseif (section .eq. 'CHAN') then
-         sect_type_val = 5.d0
-      elseif (section .eq. 'L   ') then
-         sect_type_val = 6.d0
-      elseif (section .eq. 'BOX ') then
-         if((dims_temp(3).gt.open_tol).and.
+      if(section.eq.'RECT') then
+         sect_type_val=1.d0
+      elseif(section.eq.'CIRC') then
+         if(native_section) then
+!           Native CIRC uses diameters of ellipse, not radius.
+            if(n.eq.1) dims_temp(2)=dims_temp(1)
+            dims_temp(1)=0.5d0*dims_temp(1)
+            dims_temp(2)=0.5d0*dims_temp(2)
+            sect_type_val=8.d0
+         else
+            sect_type_val=2.d0
+         endif
+      elseif(section.eq.'PIPE') then
+         sect_type_val=2.d0
+      elseif(section.eq.'I   ') then
+         sect_type_val=3.d0
+      elseif(section.eq.'T   ') then
+         sect_type_val=4.d0
+      elseif(section.eq.'CHAN') then
+         sect_type_val=5.d0
+      elseif(section.eq.'L   ') then
+         sect_type_val=6.d0
+      elseif(section.eq.'BOX ') then
+         if((.not.native_section).and.
+     &      (dims_temp(3).gt.open_tol).and.
      &      (dims_temp(5).gt.open_tol).and.
      &      (dabs(dims_temp(3)-dims_temp(5)).le.flange_tol).and.
      &      (((dims_temp(4).gt.open_tol).and.
      &        (dabs(dims_temp(6)).le.open_tol)).or.
      &       ((dabs(dims_temp(4)).le.open_tol).and.
      &        (dims_temp(6).gt.open_tol)))) then
-!
-!           Three-sided BOX -> channel.  Preserve h,b and convert the
-!           remaining dimensions to CHAN(h,b,t_flange,t_web).
-!
-            write(*,*) '*INFO: open SECTION=BOX detected for ',elset
-            write(*,*) '       mapping Mecway 3-sided box to CHAN'
-            if(dims_temp(4).gt.open_tol) then
-               dims_temp(4)=dims_temp(4)
-            else
+!           Preserve legacy UB31 USER BEAM SECTION channel shortcut.
+            if(dims_temp(4).le.open_tol) then
                dims_temp(4)=dims_temp(6)
             endif
             dims_temp(3)=0.5d0*(dims_temp(3)+dims_temp(5))
             dims_temp(5)=0.d0
             dims_temp(6)=0.d0
-            sect_type_val = 5.d0
+            sect_type_val=5.d0
          else
-            sect_type_val = 7.d0
+            sect_type_val=7.d0
          endif
       else
-         sect_type_val = 1.d0
+         write(*,*) '*ERROR: unsupported UB31 section ',section
+         ier=1
+         return
+      endif
+!     Validate canonical section dimensions.
+      if((section.eq.'RECT').or.(section.eq.'BOX ').or.
+     &   (section.eq.'CIRC'.and.native_section)) then
+         if(dims_temp(1).le.0.d0.or.dims_temp(2).le.0.d0) then
+            write(*,*) '*ERROR: invalid beam section dimension'
+            ier=1
+            return
+         endif
+      endif
+      if(section.eq.'PIPE') then
+         if(dims_temp(1).le.0.d0.or.dims_temp(2).le.0.d0.or.
+     &      dims_temp(2).ge.dims_temp(1)) then
+            write(*,*) '*ERROR: invalid PIPE geometry'
+            ier=1
+            return
+         endif
+      endif
+      if(section.eq.'BOX '.and.sect_type_val.eq.7.d0) then
+         if(minval(dims_temp(3:6)).lt.0.d0.or.
+     &      dims_temp(3)+dims_temp(5).ge.dims_temp(1).or.
+     &      dims_temp(4)+dims_temp(6).ge.dims_temp(2).or.
+     &      sum(dims_temp(3:6)).le.0.d0) then
+            write(*,*) '*ERROR: invalid BOX geometry'
+            ier=1
+            return
+         endif
       endif
 !
       thickness1=dims_temp(1)
@@ -333,7 +375,7 @@
 !
       p(1)=0.d0
       p(2)=0.d0
-      p(3)=0.d0
+      p(3)=-1.d0
       if(.not.((istat.lt.0).or.(key.eq.1))) then
          indexx=-1
          read(textpart(1)(1:20),'(f20.0)',iostat=istat) p(1)
@@ -348,9 +390,9 @@
                p(j)=p(j)/dd
             enddo
          else
-            p(1)=0.d0
-            p(2)=0.d0
-            p(3)=0.d0
+            write(*,*) '*ERROR: explicitly zero beam normal'
+            ier=1
+            return
          endif
       endif
 !
