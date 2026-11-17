@@ -46,6 +46,44 @@ def patch_element_types(text: str, beam_type: str | None) -> str:
     return pattern.sub(rf"\1{beam_type}", text)
 
 
+def convert_legacy_box_order(text):
+    """Convert old Mecway BOX h,b,bottom,left,top,right to CCX BOX.
+
+    This is explicitly opt-in. Re-running is safe because converted
+    section cards are marked and not converted twice.
+    """
+    marker = "** MECWAY_BOX_ORDER_CONVERTED_TO_CCX"
+    header = re.compile(r"^\s*\*BEAM SECTION\b.*\bSECTION\s*=\s*BOX\b", re.I)
+    lines = text.splitlines(True)
+    result = []
+    awaiting = False
+    for line in lines:
+        if awaiting and not line.strip().startswith("**") and line.strip():
+            if line.lstrip().startswith("*"):
+                raise ValueError("BOX section missing dimension data")
+            raw = line.rstrip("\r\n")
+            parts = [x.strip() for x in raw.split(",")]
+            if len(parts) != 6 or not all(parts):
+                raise ValueError("Legacy BOX needs six numeric fields")
+            # Legacy: h,b,bottom,left,top,right
+            # CCX:    a,b,right,top,left,bottom
+            order = [parts[1], parts[0], parts[5],
+                     parts[4], parts[3], parts[2]]
+            newline = "\r\n" if line.endswith("\r\n") else (
+                "\n" if line.endswith("\n") else "")
+            line = ",".join(order) + newline
+            awaiting = False
+        if header.match(line) and (
+            not result or result[-1].strip() != marker
+        ):
+            result.append(marker + "\n")
+            awaiting = True
+        result.append(line)
+    if awaiting:
+        raise ValueError("BOX section missing dimension data at end of deck")
+    return "".join(result)
+
+
 def make_release_block(releases: list[dict]) -> str:
     if not releases:
         return ""
@@ -118,6 +156,11 @@ def main() -> int:
         help="Override plain B31 element cards globally",
     )
     parser.add_argument(
+        "--legacy-box-order",
+        action="store_true",
+        help="Convert old Mecway BOX dimensions to native CCX order",
+    )
+    parser.add_argument(
         "--no-run",
         action="store_true",
         help="Patch the deck but do not launch CCX",
@@ -135,6 +178,8 @@ def main() -> int:
 
     original = inp.read_text(encoding="utf-8", errors="replace")
     patched = patch_element_types(original, beam_type)
+    if args.legacy_box_order or config.get("legacy_box_order", False):
+        patched = convert_legacy_box_order(patched)
     patched = insert_before_first_step(patched, make_release_block(releases))
 
     backup = inp.with_suffix(inp.suffix + ".mecway-original")
