@@ -1,5 +1,5 @@
 *HEADING
-19 - Mecway open channel exported as SECTION=BOX with zero wall
+19 - Native CCX BOX, open right wall using canonical field order
 *NODE, NSET=NALL
 1,0,0,0
 2,1,0,0
@@ -11,7 +11,7 @@
 *DENSITY
 7850
 *BEAM SECTION, ELSET=E1, MATERIAL=C180X70, SECTION=BOX
-0.18,0.07,0.011,0.008,0.011,0
+0.07,0.18,0,0.011,0.008,0.011
 0,0,1
 *BOUNDARY
 1,1,6

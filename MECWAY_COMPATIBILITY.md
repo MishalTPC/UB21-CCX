@@ -26,7 +26,10 @@ This retains native-readable CalculiX-style input for preprocessors while avoidi
 
 For a transparent Mecway workflow, the preferred long-term integration is for the exporter to emit `B31T` or `B31E` when the direct beam formulation is selected. If Mecway currently emits only `B31`, exporter support is required rather than overriding CalculiX's existing `B31` semantics.
 
-See `NATIVE_BEAM_INTERFACE.md` and validation decks 16-18.
+Native `SECTION=BOX` is `a,b,t_right,t_top,t_left,t_bottom`.
+The previous UB31 field order `h,b,t_bottom,t_left,t_top,t_right`
+is not the same. Old Mecway BOX cards need explicit conversion.
+See `CCX_BEAM_CONVENTIONS.md` and validation decks 16-27.
 
 ## Validation status
 

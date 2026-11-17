@@ -2,6 +2,9 @@ name: Build CCX UB31 Linux
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - dev
   push:
     branches:
       - dev
@@ -51,7 +54,6 @@ jobs:
           if-no-files-found: error
 
       - name: Native beam smoke tests
-        continue-on-error: true
         run: |
           mkdir -p build-smoke
           cp src/ccx_2.23 build-smoke/
@@ -59,8 +61,11 @@ jobs:
           cp validation/17_native_b31e_cantilever.inp build-smoke/
           cp validation/18_legacy_b31_unchanged.inp build-smoke/
           cp validation/19_mecway_open_channel_box.inp build-smoke/
+          cp validation/2[2-7]_*.inp build-smoke/
           cd build-smoke
           ./ccx_2.23 16_native_b31t_cantilever
           ./ccx_2.23 17_native_b31e_cantilever
           ./ccx_2.23 18_legacy_b31_unchanged
           ./ccx_2.23 19_mecway_open_channel_box
+          for job in 2[2-7]_*.inp; do ./ccx_2.23 "${job%.inp}"; done
+          python3 ../validation/check_ccx_beam_conventions.py

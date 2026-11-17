@@ -38,20 +38,16 @@ The internal `T`/`E` marker is retained in `lakon(5:5)` and the UB31 kernel uses
 
 ## Current scope
 
-The native interface reuses the current UB31 section reader and therefore supports the section families already implemented there (`RECT`, `CIRC`, `PIPE`, `I`, `T`, `CHAN`, `L`, `BOX`). `SECTION=GENERAL` is not yet claimed as supported by this interface.
+The native interface reuses the current UB31 section reader and therefore supports the section families already implemented there (`RECT`, `CIRC`, `PIPE`, `I`, `T`, `CHAN`, `L`, `BOX`). `SECTION=GENERAL` is not yet claimed as supported by this interface. See [CCX_BEAM_CONVENTIONS.md](CCX_BEAM_CONVENTIONS.md) for native geometric data, axis rules, and limitations.
 
 ### Mecway open-section compatibility
 
-Mecway can encode an open channel as a six-value `SECTION=BOX` card with one web thickness equal to zero, for example:
+Native `*BEAM SECTION, SECTION=BOX` now uses standard CalculiX field
+ordering. A BOX section with one missing wall remains an open BOX:
+it is no longer silently remapped to `CHAN`. Older Mecway input
+that uses the custom `h,b,t_bottom,t_left,t_top,t_right` ordering
+must be converted explicitly by the exporter or bridge before
+the solver is run. Do not reuse legacy BOX data without mapping.
 
-```text
-*BEAM SECTION, ELSET=E1, MATERIAL=C180X70, SECTION=BOX
-0.18,0.07,0.011,0.008,0.011,0
-0,0,1
-```
-
-For native `B31T`/`B31E` elements, this pattern is detected automatically and mapped to the UB31 `CHAN` formulation when the top and bottom flange thicknesses match. The generic BOX property routine also avoids the closed-section torsion formula whenever a wall thickness is zero.
-
-This compatibility only applies when Mecway actually writes a `*BEAM SECTION` card. If Mecway omits a section definition entirely for an unsupported geometric material type, CCX has no section dimensions to recover and cannot infer them safely.
-
-The implementation has source-level checks but still requires full rebuilt-CCX runtime regression before being considered production-ready.
+The interface still requires rebuilt CCX numerical regression
+before production use.

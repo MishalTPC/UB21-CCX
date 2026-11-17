@@ -8,6 +8,8 @@
 
 A native extension and patch for **CalculiX CCX 2.23** adding the **UB31 (2-node 3D Timoshenko / Euler-Bernoulli user beam element)** and **User Beam Sections** system.
 
+> **CCX beam convention update (development):** For native `B31T/B31E`, the `*BEAM SECTION` geometry and section normal must follow CalculiX conventions. See [CCX_BEAM_CONVENTIONS.md](CCX_BEAM_CONVENTIONS.md). Old Mecway BOX data require explicit conversion; these changes still need successful runtime regression.
+
 > **Native beam interface (development):** this branch accepts `*ELEMENT, TYPE=B31T` and `TYPE=B31E` with standard `*BEAM SECTION` input. `B31T` selects the Timoshenko formulation and `B31E` selects Euler-Bernoulli. The historical CalculiX `B31` element is deliberately left unchanged for backward compatibility. See `NATIVE_BEAM_INTERFACE.md`.
 
 This implementation provides high-accuracy 3D beam modeling with complete rotational coupling, 8 cross-section shapes, member end releases (hinges), 3D geometric nodal offsets, rich distributed load distributions, mass formulation choices, and enhanced post-processing in **CalculiX GraphiX (CGX)**.
